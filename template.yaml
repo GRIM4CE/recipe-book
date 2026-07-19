@@ -67,11 +67,15 @@ Resources:
       # The two accounts are created by the admin CLI; nobody can sign up.
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
+      # No self-service password reset: nothing can convert email access
+      # into a working password. Recovery = email-OTP sign-in or admin CLI.
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: admin_only
+            Priority: 1
       Policies:
-        # Cognito insists PASSWORD stays in this list; the app client below
-        # has no password flow, so it is unusable in practice.
         SignInPolicy:
-          AllowedFirstAuthFactors: [PASSWORD, WEB_AUTHN, EMAIL_OTP]
+          AllowedFirstAuthFactors: [WEB_AUTHN, EMAIL_OTP]
         PasswordPolicy:
           MinimumLength: 12
           RequireLowercase: false
