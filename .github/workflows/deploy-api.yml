@@ -64,6 +64,12 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           RP_ID="${WEB_ORIGIN#https://}"
+          # sam rejects empty parameter values; omit the key until the
+          # secret exists (the template default then disables the import).
+          EXTRA=()
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            EXTRA+=("AnthropicApiKey=$ANTHROPIC_API_KEY")
+          fi
           sam deploy \
             --stack-name recipe-book \
             --resolve-s3 \
@@ -77,4 +83,4 @@ jobs:
               "ExternalApiSecret=$EXTERNAL_API_SECRET" \
               "WebOrigin=$WEB_ORIGIN" \
               "WebAuthnRpId=${RP_ID:-localhost}" \
-              "AnthropicApiKey=$ANTHROPIC_API_KEY"
+              "${EXTRA[@]}"
