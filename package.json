@@ -1,0 +1,35 @@
+{
+  "name": "recipe-book",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Highball-style recipe cards for two: public reads, Cognito-gated writes, bearer-secret import API",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/local.ts",
+    "web": "npm run dev --prefix web",
+    "all": "concurrently -n api,web -c cyan,magenta \"npm run dev\" \"npm run web\"",
+    "seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.15.0",
+    "aws-jwt-verify": "^5.1.0",
+    "express": "^5.1.0",
+    "serverless-http": "^3.2.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.20.0",
+    "@types/supertest": "^6.0.2",
+    "concurrently": "^10.0.3",
+    "supertest": "^7.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

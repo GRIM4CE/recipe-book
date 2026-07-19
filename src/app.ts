@@ -1,0 +1,222 @@
+import express, { type ErrorRequestHandler, type RequestHandler } from "express";
+import { requireUser, type TokenVerifier } from "./auth.js";
+import type { Db } from "./db.js";
+import type { Recipe, RecipeInput } from "./types.js";
+
+export interface AppOptions {
+  db: Db;
+  verifier?: TokenVerifier | null;
+  isProduction?: boolean;
+  // Extra allowed CORS origin (the deployed web app). localhost:5173 is
+  // always allowed for dev.
+  webOrigin?: string;
+  // Prefix for photo URLs: the S3 bucket URL in prod, "" locally (the dev
+  // server serves /photos/* from disk).
+  photoBaseUrl?: string;
+}
+
+function cors(webOrigin: string): RequestHandler {
+  const allowed = new Set(["http://localhost:5173", webOrigin].filter(Boolean));
+  return (req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && allowed.has(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+      res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    }
+    if (req.method === "OPTIONS") {
+      res.status(204).end();
+      return;
+    }
+    next();
+  };
+}
+
+function parseRecipeInput(body: unknown): RecipeInput | string {
+  if (typeof body !== "object" || body === null) return "body must be an object";
+  const b = body as Record<string, unknown>;
+  if (typeof b.title !== "string" || !b.title.trim()) return "title is required";
+  for (const key of ["ingredients", "instructions"] as const) {
+    const v = b[key] ?? [];
+    if (!Array.isArray(v) || v.some((x) => typeof x !== "string")) {
+      return `${key} must be an array of strings`;
+    }
+  }
+  if (b.summary !== undefined && typeof b.summary !== "string") {
+    return "summary must be a string";
+  }
+  if (
+    b.categoryId !== undefined &&
+    b.categoryId !== null &&
+    typeof b.categoryId !== "number"
+  ) {
+    return "categoryId must be a number or null";
+  }
+  if (
+    b.photoKey !== undefined &&
+    b.photoKey !== null &&
+    typeof b.photoKey !== "string"
+  ) {
+    return "photoKey must be a string or null";
+  }
+  return {
+    title: b.title.trim(),
+    summary: (b.summary as string | undefined)?.trim() ?? "",
+    ingredients: ((b.ingredients as string[] | undefined) ?? []).filter((s) =>
+      s.trim(),
+    ),
+    instructions: ((b.instructions as string[] | undefined) ?? []).filter((s) =>
+      s.trim(),
+    ),
+    categoryId: (b.categoryId as number | null | undefined) ?? null,
+    photoKey: (b.photoKey as string | null | undefined) ?? null,
+  };
+}
+
+function parseCategoryInput(
+  body: unknown,
+): { name: string; color: string } | string {
+  if (typeof body !== "object" || body === null) return "body must be an object";
+  const b = body as Record<string, unknown>;
+  if (typeof b.name !== "string" || !b.name.trim()) return "name is required";
+  if (typeof b.color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(b.color)) {
+    return "color must be a #rrggbb hex string";
+  }
+  return { name: b.name.trim(), color: b.color };
+}
+
+export function createApp(opts: AppOptions) {
+  const { db } = opts;
+  const app = express();
+  app.use(cors(opts.webOrigin ?? ""));
+  app.use(express.json({ limit: "1mb" }));
+
+  const writeAuth = requireUser({
+    verifier: opts.verifier ?? null,
+    isProduction: opts.isProduction ?? false,
+  });
+
+  const photoBaseUrl = opts.photoBaseUrl ?? "";
+  const serialize = (r: Recipe) => ({
+    ...r,
+    photoUrl: r.photoKey ? `${photoBaseUrl}/${r.photoKey}` : null,
+  });
+
+  app.get("/healthz", (_req, res) => {
+    res.json({ ok: true });
+  });
+
+  app.get("/api/recipes", async (_req, res) => {
+    res.json({ recipes: (await db.listRecipes()).map(serialize) });
+  });
+
+  app.get("/api/recipes/:id", async (req, res) => {
+    const recipe = await db.getRecipe(Number(req.params.id));
+    if (!recipe) {
+      res.status(404).json({ error: "recipe not found" });
+      return;
+    }
+    res.json(serialize(recipe));
+  });
+
+  app.post("/api/recipes", writeAuth, async (req, res) => {
+    const input = parseRecipeInput(req.body);
+    if (typeof input === "string") {
+      res.status(400).json({ error: input });
+      return;
+    }
+    if (input.categoryId != null && !(await db.getCategory(input.categoryId))) {
+      res.status(400).json({ error: "unknown category" });
+      return;
+    }
+    const recipe = await db.createRecipe(input, {
+      createdBy: String(res.locals.username),
+      source: "web",
+    });
+    res.status(201).json(serialize(recipe));
+  });
+
+  app.put("/api/recipes/:id", writeAuth, async (req, res) => {
+    const input = parseRecipeInput(req.body);
+    if (typeof input === "string") {
+      res.status(400).json({ error: input });
+      return;
+    }
+    if (input.categoryId != null && !(await db.getCategory(input.categoryId))) {
+      res.status(400).json({ error: "unknown category" });
+      return;
+    }
+    const recipe = await db.updateRecipe(Number(req.params.id), input);
+    if (!recipe) {
+      res.status(404).json({ error: "recipe not found" });
+      return;
+    }
+    res.json(serialize(recipe));
+  });
+
+  app.delete("/api/recipes/:id", writeAuth, async (req, res) => {
+    if (!(await db.deleteRecipe(Number(req.params.id)))) {
+      res.status(404).json({ error: "recipe not found" });
+      return;
+    }
+    res.status(204).end();
+  });
+
+  app.get("/api/categories", async (_req, res) => {
+    res.json({ categories: await db.listCategories() });
+  });
+
+  app.post("/api/categories", writeAuth, async (req, res) => {
+    const input = parseCategoryInput(req.body);
+    if (typeof input === "string") {
+      res.status(400).json({ error: input });
+      return;
+    }
+    if (await db.getCategoryByName(input.name)) {
+      res.status(409).json({ error: "category already exists" });
+      return;
+    }
+    res.status(201).json(await db.createCategory(input));
+  });
+
+  app.put("/api/categories/:id", writeAuth, async (req, res) => {
+    const input = parseCategoryInput(req.body);
+    if (typeof input === "string") {
+      res.status(400).json({ error: input });
+      return;
+    }
+    const existing = await db.getCategoryByName(input.name);
+    if (existing && existing.id !== Number(req.params.id)) {
+      res.status(409).json({ error: "category already exists" });
+      return;
+    }
+    const category = await db.updateCategory(Number(req.params.id), input);
+    if (!category) {
+      res.status(404).json({ error: "category not found" });
+      return;
+    }
+    res.json(category);
+  });
+
+  app.delete("/api/categories/:id", writeAuth, async (req, res) => {
+    const result = await db.deleteCategory(Number(req.params.id));
+    if (result === "in_use") {
+      res.status(409).json({ error: "category is still used by recipes" });
+      return;
+    }
+    if (result === "missing") {
+      res.status(404).json({ error: "category not found" });
+      return;
+    }
+    res.status(204).end();
+  });
+
+  const onError: ErrorRequestHandler = (err, _req, res, _next) => {
+    console.error(err);
+    res.status(500).json({ error: "internal error" });
+  };
+  app.use(onError);
+
+  return app;
+}
