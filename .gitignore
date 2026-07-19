@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+vendor/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+out/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test and coverage
+coverage/
+.nyc_output/
+
+# Cache
+.cache/
+
+# AWS SAM build artifacts
+.aws-sam/
+samconfig.toml
+
+# recipe-book local state: dev sqlite db + uploaded photos
+data/
