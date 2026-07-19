@@ -72,6 +72,7 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+    setImporting(true);
     setError(null);
     try {
       const blob = await downscaleToJpeg(file);
@@ -79,6 +80,7 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
       await runImport({ image, mediaType: 'image/jpeg' });
     } catch (err) {
       setError(err.message);
+      setImporting(false);
     }
   }
 
