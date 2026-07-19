@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from './api.js';
+import { currentUser, logout } from './auth.js';
+import Categories from './components/Categories.jsx';
+import Login from './components/Login.jsx';
 import RecipeDetail from './components/RecipeDetail.jsx';
+import RecipeForm from './components/RecipeForm.jsx';
 import RecipeGrid from './components/RecipeGrid.jsx';
 
 // Hash routing keeps the SPA deployable without rewrite rules: the path after
@@ -18,6 +22,7 @@ export function useHashRoute() {
 
 export default function App() {
   const route = useHashRoute();
+  const [user, setUser] = useState(currentUser);
   const [recipes, setRecipes] = useState(null);
   const [categories, setCategories] = useState([]);
   const [error, setError] = useState(null);
@@ -34,17 +39,64 @@ export default function App() {
 
   useEffect(reload, [reload]);
 
+  function onSaved(recipe) {
+    reload();
+    window.location.hash = `#/recipes/${recipe.id}`;
+  }
+
+  async function onDeleteRecipe(recipe) {
+    if (!window.confirm(`Delete “${recipe.title}”?`)) return;
+    try {
+      await api.deleteRecipe(recipe.id);
+      reload();
+      window.location.hash = '#/';
+    } catch (err) {
+      window.alert(err.message);
+    }
+  }
+
+  function signOut() {
+    logout();
+    setUser(null);
+    window.location.hash = '#/';
+  }
+
   const detailMatch = route.match(/^\/recipes\/(\d+)$/);
+  const editMatch = route.match(/^\/recipes\/(\d+)\/edit$/);
+  const findRecipe = (id) => recipes?.find((r) => r.id === Number(id));
 
   let page;
   if (error) {
     page = <p className="notice">Couldn’t load recipes: {error}</p>;
+  } else if (route === '/login') {
+    page = <Login onLogin={setUser} />;
   } else if (recipes === null) {
     page = <p className="notice">Loading…</p>;
+  } else if (route === '/new') {
+    page = user ? (
+      <RecipeForm categories={categories} onSaved={onSaved} />
+    ) : (
+      <Login onLogin={setUser} />
+    );
+  } else if (editMatch) {
+    const recipe = findRecipe(editMatch[1]);
+    page = !user ? (
+      <Login onLogin={setUser} />
+    ) : recipe ? (
+      <RecipeForm recipe={recipe} categories={categories} onSaved={onSaved} />
+    ) : (
+      <p className="notice">That recipe doesn’t exist (anymore).</p>
+    );
+  } else if (route === '/categories') {
+    page = user ? (
+      <Categories categories={categories} onChanged={reload} />
+    ) : (
+      <Login onLogin={setUser} />
+    );
   } else if (detailMatch) {
-    const recipe = recipes.find((r) => r.id === Number(detailMatch[1]));
+    const recipe = findRecipe(detailMatch[1]);
     page = recipe ? (
-      <RecipeDetail recipe={recipe} />
+      <RecipeDetail recipe={recipe} canEdit={Boolean(user)} onDelete={onDeleteRecipe} />
     ) : (
       <p className="notice">That recipe doesn’t exist (anymore).</p>
     );
@@ -56,6 +108,19 @@ export default function App() {
     <div className="app">
       <header className="header">
         <a href="#/" className="wordmark">Recipe Book</a>
+        <nav className="nav">
+          {user ? (
+            <>
+              <a className="btn primary small" href="#/new">+ Recipe</a>
+              <a className="btn ghost small" href="#/categories">Categories</a>
+              <button className="btn ghost small" type="button" onClick={signOut}>
+                Sign out
+              </button>
+            </>
+          ) : (
+            <a className="btn ghost small" href="#/login">Sign in</a>
+          )}
+        </nav>
       </header>
       <main>{page}</main>
     </div>

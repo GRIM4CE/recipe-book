@@ -1,4 +1,4 @@
-export default function RecipeDetail({ recipe }) {
+export default function RecipeDetail({ recipe, canEdit, onDelete }) {
   const color = recipe.category?.color ?? '#8b8378';
   const added = new Date(recipe.createdAt).toLocaleDateString(undefined, {
     year: 'numeric',
@@ -40,6 +40,15 @@ export default function RecipeDetail({ recipe }) {
             ))}
           </ol>
         </section>
+      )}
+
+      {canEdit && (
+        <div className="detail-actions">
+          <a className="btn ghost" href={`#/recipes/${recipe.id}/edit`}>Edit</a>
+          <button className="btn danger" type="button" onClick={() => onDelete(recipe)}>
+            Delete
+          </button>
+        </div>
       )}
 
       <p className="detail-meta">
