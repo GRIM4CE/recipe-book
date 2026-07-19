@@ -55,6 +55,9 @@ export const api = {
     return key;
   },
 
+  // Turn pasted text or a photographed recipe into prefilled form fields.
+  extractRecipe: (data) => authed('/api/extract', { method: 'POST', body: json(data) }),
+
   createCategory: (data) =>
     authed('/api/categories', { method: 'POST', body: json(data) }),
   updateCategory: (id, data) =>

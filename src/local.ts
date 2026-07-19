@@ -4,6 +4,7 @@ import { createApp } from "./app.js";
 import { createCognitoVerifier } from "./auth.js";
 import { loadConfig } from "./config.js";
 import { createDb } from "./db.js";
+import { createClaudeExtractor } from "./extract.js";
 import { createLocalPresigner, createS3Presigner } from "./uploads.js";
 
 const config = loadConfig();
@@ -34,6 +35,9 @@ const app = createApp({
     ? `https://${config.s3Bucket}.s3.${config.s3Region}.amazonaws.com`
     : "",
   externalSecret: config.externalApiSecret,
+  extractor: config.anthropicApiKey
+    ? createClaudeExtractor({ apiKey: config.anthropicApiKey })
+    : null,
 });
 
 const server = app.listen(config.serverPort, () => {

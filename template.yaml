@@ -22,6 +22,11 @@ Parameters:
     Type: String
     Default: localhost
     Description: Passkey relying-party ID (the web app's bare domain; CI derives it from WebOrigin)
+  AnthropicApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Anthropic API key for recipe import extraction (empty disables it)
 
 Resources:
   Api:
@@ -43,6 +48,7 @@ Resources:
           DB_AUTH_TOKEN: !Ref DbAuthToken
           EXTERNAL_API_SECRET: !Ref ExternalApiSecret
           WEB_ORIGIN: !Ref WebOrigin
+          ANTHROPIC_API_KEY: !Ref AnthropicApiKey
           COGNITO_USER_POOL_ID: !Ref UserPool
           COGNITO_CLIENT_ID: !Ref UserPoolClient
           S3_BUCKET: !Ref PhotosBucket

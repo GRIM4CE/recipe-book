@@ -61,6 +61,7 @@ jobs:
           DB_AUTH_TOKEN: ${{ secrets.DB_AUTH_TOKEN }}
           EXTERNAL_API_SECRET: ${{ secrets.EXTERNAL_API_SECRET }}
           WEB_ORIGIN: ${{ vars.WEB_ORIGIN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           RP_ID="${WEB_ORIGIN#https://}"
           sam deploy \
@@ -75,4 +76,5 @@ jobs:
               "DbAuthToken=$DB_AUTH_TOKEN" \
               "ExternalApiSecret=$EXTERNAL_API_SECRET" \
               "WebOrigin=$WEB_ORIGIN" \
-              "WebAuthnRpId=${RP_ID:-localhost}"
+              "WebAuthnRpId=${RP_ID:-localhost}" \
+              "AnthropicApiKey=$ANTHROPIC_API_KEY"
