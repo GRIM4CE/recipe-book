@@ -145,16 +145,24 @@ curl <ApiUrl>/api/recipes                # {"recipes":[]}
 
 ### Create the two accounts
 
-Admin-created users start in FORCE_CHANGE_PASSWORD and cannot sign in through
-the app until the password is made permanent — do both steps per user:
+Sign-in is passkey-first with email codes as bootstrap/recovery, so each
+account needs a verified email and no usable password (the random one below
+only clears Cognito's initial challenge state; the app client has no
+password flow):
 
 ```sh
 aws cognito-idp admin-create-user \
-  --user-pool-id <UserPoolId> --username <name> --message-action SUPPRESS
+  --user-pool-id <UserPoolId> --username <name> \
+  --user-attributes Name=email,Value=<email> Name=email_verified,Value=true \
+  --message-action SUPPRESS
 aws cognito-idp admin-set-user-password \
   --user-pool-id <UserPoolId> --username <name> \
-  --password '<password, 12+ chars>' --permanent
+  --password "$(openssl rand -base64 24)" --permanent
 ```
+
+First sign-in on each device: enter the username, choose “Email me a code
+instead”, then accept the “Add a passkey” banner. After that it's Face
+ID/fingerprint only. A lost phone just repeats this bootstrap.
 
 ## 3. Web (Amplify Hosting)
 
@@ -191,7 +199,8 @@ dropped, not created.
 
 - [ ] `curl <ApiUrl>/healthz` → `{"ok":true}`
 - [ ] Amplify URL renders the (empty) grid — proves CORS
-- [ ] Sign in as each account; anonymous visitors see no write UI
+- [ ] Sign in as each account with an email code; anonymous visitors see no write UI
+- [ ] Register a passkey on each phone; sign out and back in via passkey
 - [ ] Create a recipe with a photo — proves JWT, presign, public S3 read
 - [ ] Recipe shows "Added by <account>" attribution
 - [ ] `POST /api/external/recipes` with a wrong secret → 401; right secret → recipe appears
