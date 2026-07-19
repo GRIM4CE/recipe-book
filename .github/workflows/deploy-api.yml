@@ -1,0 +1,72 @@
+name: deploy-api
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'template.yaml'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy-api.yml'
+  # Manual runs: used to re-deploy after changing the WEB_ORIGIN variable.
+  workflow_dispatch:
+
+# OIDC: the job trades its GitHub identity token for the recipe-book-deploy
+# IAM role. No AWS keys are stored in the repo or its secrets.
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - run: sam build
+
+      - name: sam deploy
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_AUTH_TOKEN: ${{ secrets.DB_AUTH_TOKEN }}
+          EXTERNAL_API_SECRET: ${{ secrets.EXTERNAL_API_SECRET }}
+          WEB_ORIGIN: ${{ vars.WEB_ORIGIN }}
+        run: |
+          sam deploy \
+            --stack-name recipe-book \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --no-progressbar \
+            --parameter-overrides \
+              "DbUrl=$DB_URL" \
+              "DbAuthToken=$DB_AUTH_TOKEN" \
+              "ExternalApiSecret=$EXTERNAL_API_SECRET" \
+              "WebOrigin=$WEB_ORIGIN"

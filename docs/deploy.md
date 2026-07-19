@@ -1,10 +1,12 @@
 # Deploy runbook
 
 Three pieces: Turso (database), SAM (API + Cognito + S3), Amplify Hosting (web).
-Order matters on first deploy: Turso → SAM → Amplify → one SAM re-deploy to
+Order matters on first deploy: Turso → SAM → Amplify → one more API deploy to
 whitelist the Amplify origin for CORS.
 
-Prereqs: AWS CLI (authenticated), SAM CLI, Turso CLI.
+The API deploys from GitHub Actions, not your machine. Prereqs: AWS CLI
+(authenticated — only for the one-time IAM setup and Cognito user creation),
+Turso CLI.
 
 ## 1. Turso
 
@@ -16,21 +18,127 @@ turso db tokens create recipe-book       # → DB_AUTH_TOKEN
 
 No schema step needed — the Lambda applies the idempotent schema on cold start.
 
-## 2. API stack (SAM)
+## 2. API stack (SAM via GitHub Actions)
+
+Every push to `main` that touches `src/`, `template.yaml`, or the root
+lockfile runs `.github/workflows/deploy-api.yml`: tests, `sam build`,
+`sam deploy`. Parameter values come from GitHub Actions secrets/variables;
+AWS access uses OIDC (no stored AWS keys). The stack region lives in the
+workflow's `env` block.
+
+### One-time: IAM role for GitHub OIDC
 
 ```sh
-openssl rand -hex 32                     # → EXTERNAL_API_SECRET, keep it safe
-sam build
-sam deploy --guided --stack-name recipe-book
-# parameters: DbUrl, DbAuthToken, ExternalApiSecret; leave WebOrigin empty for now
+# GitHub's OIDC identity provider (fails harmlessly if it already exists)
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com
+
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# Role only this repo's main branch can assume
+cat > /tmp/trust.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "Federated": "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com" },
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {
+      "StringEquals": {
+        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+        "token.actions.githubusercontent.com:sub": "repo:GRIM4CE/recipe-book:ref:refs/heads/main"
+      }
+    }
+  }]
+}
+EOF
+aws iam create-role --role-name recipe-book-deploy \
+  --assume-role-policy-document file:///tmp/trust.json
+
+# Scoped to the stack's own resources
+cat > /tmp/deploy-policy.json <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "cloudformation:*",
+      "Resource": [
+        "arn:aws:cloudformation:*:${ACCOUNT_ID}:stack/recipe-book/*",
+        "arn:aws:cloudformation:*:${ACCOUNT_ID}:stack/aws-sam-cli-managed-default/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": "cloudformation:CreateChangeSet",
+      "Resource": "arn:aws:cloudformation:*:aws:transform/Serverless-2016-10-31"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["cloudformation:GetTemplateSummary", "cloudformation:ValidateTemplate"],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::aws-sam-cli-managed-default*",
+        "arn:aws:s3:::recipe-book-*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": "lambda:*",
+      "Resource": "arn:aws:lambda:*:${ACCOUNT_ID}:function:recipe-book-*"
+    },
+    { "Effect": "Allow", "Action": "cognito-idp:*", "Resource": "*" },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole", "iam:DeleteRole", "iam:GetRole", "iam:PassRole",
+        "iam:AttachRolePolicy", "iam:DetachRolePolicy",
+        "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:GetRolePolicy",
+        "iam:TagRole", "iam:UntagRole",
+        "iam:ListRolePolicies", "iam:ListAttachedRolePolicies"
+      ],
+      "Resource": "arn:aws:iam::${ACCOUNT_ID}:role/recipe-book-*"
+    }
+  ]
+}
+EOF
+aws iam put-role-policy --role-name recipe-book-deploy \
+  --policy-name deploy --policy-document file:///tmp/deploy-policy.json
+
+echo "AWS_ROLE_ARN: arn:aws:iam::${ACCOUNT_ID}:role/recipe-book-deploy"
 ```
 
-Note the stack outputs: `ApiUrl`, `UserPoolId`, `UserPoolClientId`,
-`PhotosBucketName`.
+### GitHub → repo Settings → Secrets and variables → Actions
 
-Smoke test:
+Secrets:
+
+| Secret | Value |
+|---|---|
+| `DB_URL` | `turso db show recipe-book --url` |
+| `DB_AUTH_TOKEN` | `turso db tokens create recipe-book` |
+| `EXTERNAL_API_SECRET` | `openssl rand -hex 32` — the importer needs this same value |
+
+Variables:
+
+| Variable | Value |
+|---|---|
+| `AWS_ROLE_ARN` | the role ARN echoed by the setup above |
+| `WEB_ORIGIN` | leave unset for now — filled in at step 4 |
+
+### First deploy + smoke test
+
+Push to `main` (or Actions → deploy-api → Run workflow), wait for green, then:
 
 ```sh
+aws cloudformation describe-stacks --stack-name recipe-book \
+  --query 'Stacks[0].Outputs' --output table
+# outputs: ApiUrl, UserPoolId, UserPoolClientId, PhotosBucketName
+
 curl <ApiUrl>/healthz                    # {"ok":true}
 curl <ApiUrl>/api/recipes                # {"recipes":[]}
 ```
@@ -65,10 +173,9 @@ Deploy, note the app URL (`https://main.….amplifyapp.com`).
 
 ## 4. Allow the web origin (CORS)
 
-```sh
-sam deploy --parameter-overrides WebOrigin=https://main.<app-id>.amplifyapp.com
-# other parameters keep their previous values
-```
+Set the `WEB_ORIGIN` GitHub Actions **variable** to the Amplify URL
+(`https://main.<app-id>.amplifyapp.com`, no trailing slash), then re-run the
+deploy: Actions → deploy-api → Run workflow.
 
 ## 5. Importer
 
@@ -94,6 +201,8 @@ dropped, not created.
 
 - CloudFront in front of the photos bucket is the upgrade path if photo
   latency ever matters; S3 URLs are already HTTPS.
-- `samconfig.toml` is gitignored because parameter overrides include secrets.
+- CI is the deploy path. A local `sam deploy` still works in a pinch (you'd
+  need the parameter values); `samconfig.toml` stays gitignored because
+  parameter overrides include secrets.
 - Cost expectation: Lambda + Cognito + S3 at household traffic ≈ $0; Amplify
   Hosting pennies/month; Turso free tier.
