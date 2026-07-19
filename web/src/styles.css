@@ -28,6 +28,10 @@ body {
     'Segoe UI', Roboto, sans-serif;
   background: var(--bg);
   color: var(--ink);
+  /* No double-tap zoom; pinch is blocked via the viewport meta + gesturestart. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .app {
@@ -42,6 +46,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* On narrow screens the nav drops to its own row instead of crushing the title. */
+  flex-wrap: wrap;
+  row-gap: 10px;
   padding: 20px 4px 12px;
 }
 
@@ -51,6 +58,7 @@ body {
   letter-spacing: -0.02em;
   color: var(--ink);
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .notice {
@@ -299,6 +307,7 @@ body {
   cursor: pointer;
   text-decoration: none;
   text-align: center;
+  white-space: nowrap;
 }
 
 .btn.primary {
