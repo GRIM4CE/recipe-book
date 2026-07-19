@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../api.js';
+import { downscaleToJpeg } from '../image.js';
 
 const lines = (text) =>
   text
@@ -18,22 +19,46 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
   const [instructions, setInstructions] = useState(
     recipe?.instructions.join('\n') ?? '',
   );
+  // photo: unchanged (undefined) | removed (null) | new blob
+  const [photoBlob, setPhotoBlob] = useState(undefined);
+  const [photoPreview, setPhotoPreview] = useState(recipe?.photoUrl ?? null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  async function pickPhoto(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setError(null);
+    try {
+      const blob = await downscaleToJpeg(file);
+      setPhotoBlob(blob);
+      setPhotoPreview(URL.createObjectURL(blob));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  function removePhoto() {
+    setPhotoBlob(null);
+    setPhotoPreview(null);
+  }
 
   async function submit(e) {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const data = {
-      title,
-      summary,
-      categoryId: categoryId === '' ? null : Number(categoryId),
-      ingredients: lines(ingredients),
-      instructions: lines(instructions),
-      photoKey: recipe?.photoKey ?? null,
-    };
     try {
+      let photoKey = recipe?.photoKey ?? null;
+      if (photoBlob === null) photoKey = null;
+      else if (photoBlob) photoKey = await api.uploadPhoto(photoBlob);
+      const data = {
+        title,
+        summary,
+        categoryId: categoryId === '' ? null : Number(categoryId),
+        ingredients: lines(ingredients),
+        instructions: lines(instructions),
+        photoKey,
+      };
       const saved = recipe
         ? await api.updateRecipe(recipe.id, data)
         : await api.createRecipe(data);
@@ -70,6 +95,21 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
           ))}
         </select>
       </label>
+      <div className="photo-field">
+        <span className="field-title">Photo</span>
+        {photoPreview && <img className="photo-preview" src={photoPreview} alt="" />}
+        <div className="form-actions photo-actions">
+          <label className="btn ghost small">
+            {photoPreview ? 'Replace photo' : 'Add photo'}
+            <input type="file" accept="image/*" onChange={pickPhoto} hidden />
+          </label>
+          {photoPreview && (
+            <button className="btn danger small" type="button" onClick={removePhoto}>
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
       <label>
         Ingredients <span className="hint-inline">one per line</span>
         <textarea

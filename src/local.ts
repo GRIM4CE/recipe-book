@@ -4,6 +4,7 @@ import { createApp } from "./app.js";
 import { createCognitoVerifier } from "./auth.js";
 import { loadConfig } from "./config.js";
 import { createDb } from "./db.js";
+import { createLocalPresigner, createS3Presigner } from "./uploads.js";
 
 const config = loadConfig();
 if (config.dbUrl.startsWith("file:")) mkdirSync(config.dataDir, { recursive: true });
@@ -25,6 +26,13 @@ const app = createApp({
     : null,
   isProduction: config.isProduction,
   webOrigin: config.webOrigin,
+  presigner: config.s3Enabled
+    ? createS3Presigner({ bucket: config.s3Bucket, region: config.s3Region })
+    : createLocalPresigner(),
+  localPhotoDir: config.s3Enabled ? null : config.dataDir,
+  photoBaseUrl: config.s3Enabled
+    ? `https://${config.s3Bucket}.s3.${config.s3Region}.amazonaws.com`
+    : "",
 });
 
 const server = app.listen(config.serverPort, () => {

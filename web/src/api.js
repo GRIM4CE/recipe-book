@@ -43,6 +43,18 @@ export const api = {
     authed(`/api/recipes/${id}`, { method: 'PUT', body: json(data) }),
   deleteRecipe: (id) => authed(`/api/recipes/${id}`, { method: 'DELETE' }),
 
+  // Presign, PUT the bytes directly to storage, return the stored key.
+  uploadPhoto: async (blob) => {
+    const { uploadUrl, key } = await authed('/api/uploads', { method: 'POST' });
+    const res = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'image/jpeg' },
+      body: blob,
+    });
+    if (!res.ok) throw new Error('Photo upload failed');
+    return key;
+  },
+
   createCategory: (data) =>
     authed('/api/categories', { method: 'POST', body: json(data) }),
   updateCategory: (id, data) =>

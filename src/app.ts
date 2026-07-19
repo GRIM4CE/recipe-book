@@ -1,7 +1,11 @@
+import { mkdirSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import express, { type ErrorRequestHandler, type RequestHandler } from "express";
 import { requireUser, type TokenVerifier } from "./auth.js";
 import type { Db } from "./db.js";
 import type { Recipe, RecipeInput } from "./types.js";
+import type { Presigner } from "./uploads.js";
 
 export interface AppOptions {
   db: Db;
@@ -13,6 +17,11 @@ export interface AppOptions {
   // Prefix for photo URLs: the S3 bucket URL in prod, "" locally (the dev
   // server serves /photos/* from disk).
   photoBaseUrl?: string;
+  // Issues photo upload URLs. Absent → uploads are disabled (503).
+  presigner?: Presigner | null;
+  // Local dev only: directory that backs the disk photo store. Enables the
+  // PUT/GET routes the local presigner points at.
+  localPhotoDir?: string | null;
 }
 
 function cors(webOrigin: string): RequestHandler {
@@ -162,6 +171,46 @@ export function createApp(opts: AppOptions) {
     }
     res.status(204).end();
   });
+
+  app.post("/api/uploads", writeAuth, async (_req, res) => {
+    if (!opts.presigner) {
+      res.status(503).json({ error: "photo uploads are not configured" });
+      return;
+    }
+    res.json(await opts.presigner.presign());
+  });
+
+  if (opts.localPhotoDir) {
+    const photoDir = join(opts.localPhotoDir, "photos");
+    mkdirSync(photoDir, { recursive: true });
+    const validName = /^[0-9a-f-]{36}\.jpg$/;
+
+    app.put(
+      "/api/uploads/photos/:name",
+      express.raw({ type: "image/jpeg", limit: "10mb" }),
+      async (req, res) => {
+        if (!validName.test(req.params.name) || !Buffer.isBuffer(req.body)) {
+          res.status(400).json({ error: "invalid upload" });
+          return;
+        }
+        await writeFile(join(photoDir, req.params.name), req.body);
+        res.status(201).json({ ok: true });
+      },
+    );
+
+    app.get("/photos/:name", async (req, res) => {
+      if (!validName.test(req.params.name)) {
+        res.status(400).json({ error: "invalid photo name" });
+        return;
+      }
+      try {
+        const data = await readFile(join(photoDir, req.params.name));
+        res.setHeader("Content-Type", "image/jpeg").send(data);
+      } catch {
+        res.status(404).json({ error: "photo not found" });
+      }
+    });
+  }
 
   app.get("/api/categories", async (_req, res) => {
     res.json({ categories: await db.listCategories() });

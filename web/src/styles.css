@@ -395,6 +395,29 @@ body {
   justify-content: flex-end;
 }
 
+.photo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.photo-preview {
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.photo-actions {
+  justify-content: flex-start;
+}
+
 .login-form {
   max-width: 380px;
   padding-top: 24px;
