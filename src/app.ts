@@ -5,6 +5,7 @@ import express, { type ErrorRequestHandler, type RequestHandler } from "express"
 import { requireUser, type TokenVerifier } from "./auth.js";
 import { createExternalRouter } from "./external.js";
 import type { Db } from "./db.js";
+import type { ExtractedRecipe, Extractor } from "./extract.js";
 import type { Recipe, RecipeInput } from "./types.js";
 import type { Presigner } from "./uploads.js";
 
@@ -25,6 +26,9 @@ export interface AppOptions {
   localPhotoDir?: string | null;
   // Bearer secret for the /api/external importer surface. Empty → 503s.
   externalSecret?: string;
+  // Turns pasted text or a recipe photo into structured fields. Absent →
+  // extraction is disabled (503).
+  extractor?: Extractor | null;
 }
 
 function cors(webOrigin: string): RequestHandler {
@@ -98,16 +102,83 @@ function parseCategoryInput(
   return { name: b.name.trim(), color: b.color };
 }
 
+function parseExtractInput(
+  body: unknown,
+): { text: string } | { image: string } | string {
+  if (typeof body !== "object" || body === null) return "body must be an object";
+  const b = body as Record<string, unknown>;
+  if ((b.text === undefined) === (b.image === undefined)) {
+    return "provide exactly one of text or image";
+  }
+  if (b.text !== undefined) {
+    if (typeof b.text !== "string" || !b.text.trim()) {
+      return "text must be a non-empty string";
+    }
+    return { text: b.text };
+  }
+  if (typeof b.image !== "string" || !b.image) {
+    return "image must be a base64 string";
+  }
+  if (b.mediaType !== "image/jpeg") return "mediaType must be image/jpeg";
+  return { image: b.image };
+}
+
 export function createApp(opts: AppOptions) {
   const { db } = opts;
   const app = express();
   app.use(cors(opts.webOrigin ?? ""));
-  app.use(express.json({ limit: "1mb" }));
 
   const writeAuth = requireUser({
     verifier: opts.verifier ?? null,
     isProduction: opts.isProduction ?? false,
   });
+
+  // Registered before the global 1mb parser: the body carries a base64
+  // image, so this route parses its own body with a larger cap.
+  app.post(
+    "/api/extract",
+    express.json({ limit: "10mb" }),
+    writeAuth,
+    async (req, res) => {
+      if (!opts.extractor) {
+        res.status(503).json({ error: "recipe extraction is not configured" });
+        return;
+      }
+      const input = parseExtractInput(req.body);
+      if (typeof input === "string") {
+        res.status(400).json({ error: input });
+        return;
+      }
+      const categories = await db.listCategories();
+      let result: ExtractedRecipe;
+      try {
+        result = await opts.extractor.extract({
+          ...input,
+          categoryNames: categories.map((c) => c.name),
+        });
+      } catch (err) {
+        console.error("extraction failed:", err);
+        res.status(502).json({ error: "extraction failed" });
+        return;
+      }
+      if (!result.found) {
+        res.status(422).json({ error: "no recipe found in that input" });
+        return;
+      }
+      const category = result.category
+        ? await db.getCategoryByName(result.category)
+        : null;
+      res.json({
+        title: result.title,
+        summary: result.summary,
+        ingredients: result.ingredients,
+        instructions: result.instructions,
+        categoryId: category?.id ?? null,
+      });
+    },
+  );
+
+  app.use(express.json({ limit: "1mb" }));
 
   const photoBaseUrl = opts.photoBaseUrl ?? "";
   const serialize = (r: Recipe) => ({
