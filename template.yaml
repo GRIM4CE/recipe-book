@@ -18,6 +18,10 @@ Parameters:
     Type: String
     Default: ''
     Description: Deployed web origin allowed by CORS (the Amplify URL)
+  WebAuthnRpId:
+    Type: String
+    Default: localhost
+    Description: Passkey relying-party ID (the web app's bare domain; CI derives it from WebOrigin)
 
 Resources:
   Api:
@@ -56,10 +60,18 @@ Resources:
     Type: AWS::Cognito::UserPool
     Properties:
       UserPoolName: recipe-book-users
+      # Essentials unlocks choice-based sign-in (passkeys + email OTP).
+      UserPoolTier: ESSENTIALS
+      WebAuthnRelyingPartyID: !Ref WebAuthnRpId
+      WebAuthnUserVerification: required
       # The two accounts are created by the admin CLI; nobody can sign up.
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
       Policies:
+        # Cognito insists PASSWORD stays in this list; the app client below
+        # has no password flow, so it is unusable in practice.
+        SignInPolicy:
+          AllowedFirstAuthFactors: [PASSWORD, WEB_AUTHN, EMAIL_OTP]
         PasswordPolicy:
           MinimumLength: 12
           RequireLowercase: false
@@ -74,8 +86,12 @@ Resources:
       # No secret: the browser calls InitiateAuth directly.
       GenerateSecret: false
       ExplicitAuthFlows:
-        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_USER_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
+      # A device stays signed in for a year; renewal is one biometric tap.
+      RefreshTokenValidity: 365
+      TokenValidityUnits:
+        RefreshToken: days
 
   PhotosBucket:
     Type: AWS::S3::Bucket
