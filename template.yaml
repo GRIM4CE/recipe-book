@@ -81,7 +81,9 @@ Resources:
             Priority: 1
       Policies:
         SignInPolicy:
-          AllowedFirstAuthFactors: [WEB_AUTHN, EMAIL_OTP]
+          # AWS refuses to drop PASSWORD from this list; the app client has
+          # no password flow and recovery is admin-only, so it stays inert.
+          AllowedFirstAuthFactors: [PASSWORD, WEB_AUTHN, EMAIL_OTP]
         PasswordPolicy:
           MinimumLength: 12
           RequireLowercase: false
