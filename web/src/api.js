@@ -1,0 +1,27 @@
+const BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+
+async function req(path, options = {}) {
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...options.headers,
+    },
+  });
+  if (!res.ok) {
+    let message = `${res.status}`;
+    try {
+      message = (await res.json()).error ?? message;
+    } catch {
+      // non-JSON error body; keep the status code
+    }
+    throw new Error(message);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+export const api = {
+  listRecipes: () => req('/api/recipes').then((b) => b.recipes),
+  getRecipe: (id) => req(`/api/recipes/${id}`),
+  listCategories: () => req('/api/categories').then((b) => b.categories),
+};
