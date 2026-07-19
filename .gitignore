@@ -43,3 +43,6 @@ samconfig.toml
 
 # recipe-book local state: dev sqlite db + uploaded photos
 data/
+
+# Session scratch (subagent-driven-development ledger)
+.superpowers/
