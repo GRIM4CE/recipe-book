@@ -44,6 +44,10 @@ jobs:
         with:
           use-installer: true
 
+      # sam build's esbuild bundler installs only production deps in its
+      # scratch dir, so esbuild must be on the PATH of the build host.
+      - run: npm install -g esbuild@0.28.1
+
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
