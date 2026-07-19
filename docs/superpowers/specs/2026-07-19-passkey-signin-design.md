@@ -18,7 +18,9 @@ Native Cognito passwordless (Essentials tier), two first factors:
   bound to the production web origin.
 - **Email one-time code** — bootstrap for first-time passkey registration and
   recovery on new devices. Never used in day-to-day sign-in.
-- **Password sign-in is disabled** (not offered as a factor).
+- **Password sign-in is disabled** — Cognito requires `PASSWORD` to remain in
+  the pool's allowed first factors, so the block is enforced at the app
+  client, which has no password auth flow enabled.
 
 Implementation extends the existing hand-rolled Cognito REST client
 (`web/src/auth.js`); no AWS SDK is introduced. Alternatives considered and
@@ -39,7 +41,8 @@ via CloudShell by the operator. Docs use placeholders (`<email>`,
 
 - `UserPool`:
   - `UserPoolTier: ESSENTIALS`
-  - `Policies.SignInPolicy.AllowedFirstAuthFactors: [WEB_AUTHN, EMAIL_OTP]`
+  - `Policies.SignInPolicy.AllowedFirstAuthFactors: [PASSWORD, WEB_AUTHN, EMAIL_OTP]`
+    (`PASSWORD` is mandatory in this list; unusable via the app client)
   - `WebAuthnRelyingPartyID: !Ref WebAuthnRpId` (new parameter),
     `WebAuthnUserVerification: required`
   - keeps `AllowAdminCreateUserOnly: true`; `UserPoolName` untouched so the
