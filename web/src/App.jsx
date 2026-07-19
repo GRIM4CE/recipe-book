@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from './api.js';
+import RecipeDetail from './components/RecipeDetail.jsx';
+import RecipeGrid from './components/RecipeGrid.jsx';
 
 // Hash routing keeps the SPA deployable without rewrite rules: the path after
 // '#' is the route, e.g. #/recipes/12.
@@ -32,25 +34,30 @@ export default function App() {
 
   useEffect(reload, [reload]);
 
+  const detailMatch = route.match(/^\/recipes\/(\d+)$/);
+
+  let page;
+  if (error) {
+    page = <p className="notice">Couldn’t load recipes: {error}</p>;
+  } else if (recipes === null) {
+    page = <p className="notice">Loading…</p>;
+  } else if (detailMatch) {
+    const recipe = recipes.find((r) => r.id === Number(detailMatch[1]));
+    page = recipe ? (
+      <RecipeDetail recipe={recipe} />
+    ) : (
+      <p className="notice">That recipe doesn’t exist (anymore).</p>
+    );
+  } else {
+    page = <RecipeGrid recipes={recipes} categories={categories} />;
+  }
+
   return (
     <div className="app">
       <header className="header">
         <a href="#/" className="wordmark">Recipe Book</a>
       </header>
-      <main>
-        {error && <p className="notice">Couldn’t load recipes: {error}</p>}
-        {!error && recipes === null && <p className="notice">Loading…</p>}
-        {recipes !== null && (
-          <ul>
-            {recipes.map((r) => (
-              <li key={r.id}>
-                {r.title}
-                {r.category ? ` — ${r.category.name}` : ''}
-              </li>
-            ))}
-          </ul>
-        )}
-      </main>
+      <main>{page}</main>
     </div>
   );
 }
