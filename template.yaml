@@ -18,6 +18,11 @@ Parameters:
     Type: String
     Default: ''
     Description: Deployed web origin allowed by CORS (the Amplify URL)
+  AnthropicApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Anthropic API key for recipe import extraction (empty disables it)
 
 Resources:
   Api:
@@ -39,6 +44,7 @@ Resources:
           DB_AUTH_TOKEN: !Ref DbAuthToken
           EXTERNAL_API_SECRET: !Ref ExternalApiSecret
           WEB_ORIGIN: !Ref WebOrigin
+          ANTHROPIC_API_KEY: !Ref AnthropicApiKey
           COGNITO_USER_POOL_ID: !Ref UserPool
           COGNITO_CLIENT_ID: !Ref UserPoolClient
           S3_BUCKET: !Ref PhotosBucket

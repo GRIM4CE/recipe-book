@@ -57,6 +57,7 @@ jobs:
           DB_AUTH_TOKEN: ${{ secrets.DB_AUTH_TOKEN }}
           EXTERNAL_API_SECRET: ${{ secrets.EXTERNAL_API_SECRET }}
           WEB_ORIGIN: ${{ vars.WEB_ORIGIN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           sam deploy \
             --stack-name recipe-book \
@@ -69,4 +70,5 @@ jobs:
               "DbUrl=$DB_URL" \
               "DbAuthToken=$DB_AUTH_TOKEN" \
               "ExternalApiSecret=$EXTERNAL_API_SECRET" \
-              "WebOrigin=$WEB_ORIGIN"
+              "WebOrigin=$WEB_ORIGIN" \
+              "AnthropicApiKey=$ANTHROPIC_API_KEY"

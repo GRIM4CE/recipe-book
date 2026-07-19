@@ -122,6 +122,7 @@ Secrets:
 | `DB_URL` | `turso db show recipe-book --url` |
 | `DB_AUTH_TOKEN` | `turso db tokens create recipe-book` |
 | `EXTERNAL_API_SECRET` | `openssl rand -hex 32` — the importer needs this same value |
+| `ANTHROPIC_API_KEY` | console.anthropic.com key for recipe import extraction (optional) |
 
 Variables:
 
@@ -196,6 +197,7 @@ dropped, not created.
 - [ ] Recipe shows "Added by <account>" attribution
 - [ ] `POST /api/external/recipes` with a wrong secret → 401; right secret → recipe appears
 - [ ] Install the PWA on both phones (Share → Add to Home Screen)
+- [ ] New Recipe → paste recipe text → Extract prefills the form (proves ANTHROPIC_API_KEY)
 
 ## Notes
 

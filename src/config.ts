@@ -12,6 +12,9 @@ export interface Config {
   // Bearer secret for /api/external/* (importer). Empty = external API disabled.
   externalApiSecret: string;
   externalEnabled: boolean;
+  // Anthropic API key for recipe import extraction. Empty = extraction
+  // disabled (the route 503s).
+  anthropicApiKey: string;
   // Cognito pool/client for verifying UI write tokens. Both empty = auth
   // dev-bypass (writes run as user "dev"), refused in production.
   cognitoUserPoolId: string;
@@ -40,6 +43,7 @@ export function loadConfig(): Config {
     webOrigin: (process.env.WEB_ORIGIN ?? "").replace(/\/+$/, ""),
     externalApiSecret,
     externalEnabled: Boolean(externalApiSecret),
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
     cognitoUserPoolId,
     cognitoClientId,
     cognitoRegion: process.env.COGNITO_REGION ?? region,
