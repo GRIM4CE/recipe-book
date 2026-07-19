@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from './api.js';
-import { currentUser, logout } from './auth.js';
+import { currentUser, devMode, hasDevicePasskey, logout, registerPasskey } from './auth.js';
 import Categories from './components/Categories.jsx';
 import Login from './components/Login.jsx';
 import RecipeDetail from './components/RecipeDetail.jsx';
@@ -23,6 +23,7 @@ export function useHashRoute() {
 export default function App() {
   const route = useHashRoute();
   const [user, setUser] = useState(currentUser);
+  const [offerPasskey, setOfferPasskey] = useState(false);
   const [recipes, setRecipes] = useState(null);
   const [categories, setCategories] = useState([]);
   const [error, setError] = useState(null);
@@ -38,6 +39,19 @@ export default function App() {
   }, []);
 
   useEffect(reload, [reload]);
+
+  useEffect(() => {
+    setOfferPasskey(Boolean(user) && !devMode && !hasDevicePasskey());
+  }, [user]);
+
+  async function addPasskey() {
+    try {
+      await registerPasskey();
+      setOfferPasskey(false);
+    } catch (err) {
+      window.alert(err.message);
+    }
+  }
 
   function onSaved(recipe) {
     reload();
@@ -122,7 +136,20 @@ export default function App() {
           )}
         </nav>
       </header>
-      <main>{page}</main>
+      <main>
+        {offerPasskey && (
+          <p className="notice">
+            Add a passkey to sign in with just Face ID / fingerprint next time.{' '}
+            <button className="btn primary small" type="button" onClick={addPasskey}>
+              Add passkey
+            </button>{' '}
+            <button className="btn ghost small" type="button" onClick={() => setOfferPasskey(false)}>
+              Not now
+            </button>
+          </p>
+        )}
+        {page}
+      </main>
     </div>
   );
 }
