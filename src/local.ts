@@ -33,6 +33,7 @@ const app = createApp({
   photoBaseUrl: config.s3Enabled
     ? `https://${config.s3Bucket}.s3.${config.s3Region}.amazonaws.com`
     : "",
+  externalSecret: config.externalApiSecret,
 });
 
 const server = app.listen(config.serverPort, () => {

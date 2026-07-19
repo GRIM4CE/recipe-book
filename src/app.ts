@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import express, { type ErrorRequestHandler, type RequestHandler } from "express";
 import { requireUser, type TokenVerifier } from "./auth.js";
+import { createExternalRouter } from "./external.js";
 import type { Db } from "./db.js";
 import type { Recipe, RecipeInput } from "./types.js";
 import type { Presigner } from "./uploads.js";
@@ -22,6 +23,8 @@ export interface AppOptions {
   // Local dev only: directory that backs the disk photo store. Enables the
   // PUT/GET routes the local presigner points at.
   localPhotoDir?: string | null;
+  // Bearer secret for the /api/external importer surface. Empty → 503s.
+  externalSecret?: string;
 }
 
 function cors(webOrigin: string): RequestHandler {
@@ -260,6 +263,16 @@ export function createApp(opts: AppOptions) {
     }
     res.status(204).end();
   });
+
+  app.use(
+    "/api/external",
+    createExternalRouter({
+      db,
+      secret: opts.externalSecret ?? "",
+      presigner: opts.presigner ?? null,
+      serialize,
+    }),
+  );
 
   const onError: ErrorRequestHandler = (err, _req, res, _next) => {
     console.error(err);
