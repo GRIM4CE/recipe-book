@@ -25,3 +25,14 @@ export function downscaleToJpeg(file, maxDim = 1600, quality = 0.85) {
     img.src = url;
   });
 }
+
+// Base64 payload (without the data: prefix) for JSON transport to the
+// extraction API.
+export function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',', 2)[1]);
+    reader.onerror = () => reject(new Error('Could not read image data'));
+    reader.readAsDataURL(blob);
+  });
+}

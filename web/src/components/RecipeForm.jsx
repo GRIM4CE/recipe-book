@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from '../api.js';
-import { downscaleToJpeg } from '../image.js';
+import { blobToBase64, downscaleToJpeg } from '../image.js';
 
 const lines = (text) =>
   text
@@ -25,6 +25,12 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
+  // Import panel: only offered when creating, collapses after a successful
+  // extraction.
+  const [showImport, setShowImport] = useState(!recipe);
+  const [importText, setImportText] = useState('');
+  const [importing, setImporting] = useState(false);
+
   async function pickPhoto(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -41,6 +47,39 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
   function removePhoto() {
     setPhotoBlob(null);
     setPhotoPreview(null);
+  }
+
+  async function runImport(payload) {
+    setImporting(true);
+    setError(null);
+    try {
+      const extracted = await api.extractRecipe(payload);
+      setTitle(extracted.title);
+      setSummary(extracted.summary);
+      setCategoryId(extracted.categoryId ?? '');
+      setIngredients(extracted.ingredients.join('\n'));
+      setInstructions(extracted.instructions.join('\n'));
+      setImportText('');
+      setShowImport(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function importFromPhoto(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setError(null);
+    try {
+      const blob = await downscaleToJpeg(file);
+      const image = await blobToBase64(blob);
+      await runImport({ image, mediaType: 'image/jpeg' });
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   async function submit(e) {
@@ -72,6 +111,47 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
   return (
     <form className="form" onSubmit={submit}>
       <h2>{recipe ? 'Edit recipe' : 'New recipe'}</h2>
+      {!recipe &&
+        (showImport ? (
+          <div className="import-panel">
+            <span className="field-title">Import from text or photo</span>
+            <textarea
+              rows={4}
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder="Paste a recipe from anywhere…"
+              disabled={importing}
+            />
+            <div className="form-actions import-actions">
+              <button
+                className="btn ghost small"
+                type="button"
+                onClick={() => runImport({ text: importText })}
+                disabled={importing || !importText.trim()}
+              >
+                {importing ? 'Reading recipe…' : 'Extract from text'}
+              </button>
+              <label className="btn ghost small">
+                {importing ? 'Reading recipe…' : 'Extract from photo'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={importFromPhoto}
+                  hidden
+                  disabled={importing}
+                />
+              </label>
+            </div>
+          </div>
+        ) : (
+          <button
+            className="btn ghost small"
+            type="button"
+            onClick={() => setShowImport(true)}
+          >
+            Import from text or photo
+          </button>
+        ))}
       <label>
         Title
         <input value={title} onChange={(e) => setTitle(e.target.value)} required />
@@ -133,7 +213,7 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
         <a className="btn ghost" href={recipe ? `#/recipes/${recipe.id}` : '#/'}>
           Cancel
         </a>
-        <button className="btn primary" type="submit" disabled={busy}>
+        <button className="btn primary" type="submit" disabled={busy || importing}>
           {busy ? 'Saving…' : 'Save recipe'}
         </button>
       </div>

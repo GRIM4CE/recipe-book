@@ -418,6 +418,18 @@ body {
   justify-content: flex-start;
 }
 
+/* Import panel (New Recipe) */
+
+.import-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
 .login-form {
   max-width: 380px;
   padding-top: 24px;
