@@ -1,7 +1,7 @@
 # Passwordless sign-in: passkeys + email-code fallback
 
 Date: 2026-07-19
-Status: approved (design), pending implementation
+Status: implemented
 
 ## Problem
 
