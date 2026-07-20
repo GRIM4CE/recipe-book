@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { scaleIngredient, scaleServings } from '../scale.js';
 
 const SCALES = [
@@ -11,8 +11,9 @@ const SCALES = [
   { label: '8×', factor: 8 },
 ];
 
-export default function RecipeDetail({ recipe, canEdit, onDelete }) {
+export default function RecipeDetail({ recipe, canEdit }) {
   const [factor, setFactor] = useState(1);
+  const [shareNote, setShareNote] = useState('');
   const color = recipe.category?.color ?? '#8b8378';
   const added = new Date(recipe.createdAt).toLocaleDateString(undefined, {
     year: 'numeric',
@@ -20,10 +21,49 @@ export default function RecipeDetail({ recipe, canEdit, onDelete }) {
     day: 'numeric',
   });
 
+  // Give each recipe its own tab/history title for bookmarks and shares.
+  useEffect(() => {
+    const previous = document.title;
+    document.title = `${recipe.title} · Recipe Book`;
+    return () => {
+      document.title = previous;
+    };
+  }, [recipe.title]);
+
+  async function share() {
+    const url = window.location.href;
+    const data = { title: recipe.title, text: recipe.summary || recipe.title, url };
+    try {
+      if (navigator.share) {
+        await navigator.share(data);
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setShareNote('Link copied');
+    } catch (err) {
+      if (err?.name === 'AbortError') return; // user dismissed the share sheet
+      setShareNote('Couldn’t share');
+    }
+    setTimeout(() => setShareNote(''), 2000);
+  }
+
   return (
     <article className="detail">
-      <header className="detail-hero" style={{ '--card-color': color }}>
+      <div className="detail-topbar">
         <a className="back" href="#/">‹ All recipes</a>
+        <div className="detail-top-actions">
+          {shareNote && <span className="share-note">{shareNote}</span>}
+          <button className="btn ghost small" type="button" onClick={share}>
+            Share
+          </button>
+          {canEdit && (
+            <a className="btn ghost small" href={`#/recipes/${recipe.id}/edit`}>
+              Edit
+            </a>
+          )}
+        </div>
+      </div>
+      <header className="detail-hero" style={{ '--card-color': color }}>
         <h2>{recipe.title}</h2>
         {recipe.category && (
           <span className="card-category">{recipe.category.name}</span>
@@ -89,15 +129,6 @@ export default function RecipeDetail({ recipe, canEdit, onDelete }) {
           <h3>Notes</h3>
           <p className="notes">{recipe.notes}</p>
         </section>
-      )}
-
-      {canEdit && (
-        <div className="detail-actions">
-          <a className="btn ghost" href={`#/recipes/${recipe.id}/edit`}>Edit</a>
-          <button className="btn danger" type="button" onClick={() => onDelete(recipe)}>
-            Delete
-          </button>
-        </div>
       )}
 
       <p className="detail-meta">
