@@ -53,7 +53,7 @@ function parseRecipeInput(body: unknown): RecipeInput | string {
   if (typeof body !== "object" || body === null) return "body must be an object";
   const b = body as Record<string, unknown>;
   if (typeof b.title !== "string" || !b.title.trim()) return "title is required";
-  for (const key of ["ingredients", "instructions"] as const) {
+  for (const key of ["ingredients", "instructions", "tags"] as const) {
     const v = b[key] ?? [];
     if (!Array.isArray(v) || v.some((x) => typeof x !== "string")) {
       return `${key} must be an array of strings`;
@@ -76,6 +76,13 @@ function parseRecipeInput(body: unknown): RecipeInput | string {
   ) {
     return "photoKey must be a string or null";
   }
+  const tags: string[] = [];
+  for (const raw of (b.tags as string[] | undefined) ?? []) {
+    const tag = raw.trim();
+    if (tag && !tags.some((t) => t.toLowerCase() === tag.toLowerCase())) {
+      tags.push(tag);
+    }
+  }
   return {
     title: b.title.trim(),
     summary: (b.summary as string | undefined)?.trim() ?? "",
@@ -86,6 +93,7 @@ function parseRecipeInput(body: unknown): RecipeInput | string {
       s.trim(),
     ),
     categoryId: (b.categoryId as number | null | undefined) ?? null,
+    tags,
     photoKey: (b.photoKey as string | null | undefined) ?? null,
   };
 }

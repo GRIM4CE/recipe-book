@@ -52,8 +52,29 @@ describe("recipes", () => {
     );
   });
 
+  it("saves tags, deduping and trimming them", async () => {
+    const created = await request(app).post("/api/recipes").send({
+      title: "Buffalo Wings",
+      tags: ["Wing Sauces", " wing sauces ", "Grill Out", ""],
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.tags).toEqual(["Grill Out", "Wing Sauces"]);
+
+    const updated = await request(app)
+      .put(`/api/recipes/${created.body.id}`)
+      .send({ title: "Buffalo Wings", tags: ["Party Food"] });
+    expect(updated.body.tags).toEqual(["Party Food"]);
+  });
+
   it("rejects invalid payloads", async () => {
     expect((await request(app).post("/api/recipes").send({})).status).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post("/api/recipes")
+          .send({ title: "X", tags: [1] })
+      ).status,
+    ).toBe(400);
     expect(
       (await request(app).post("/api/recipes").send({ title: "  " })).status,
     ).toBe(400);

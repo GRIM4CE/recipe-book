@@ -530,3 +530,71 @@ body {
     font-size: 0.95rem;
   }
 }
+
+/* Tags */
+
+.chips.tag-chips {
+  margin-top: -12px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 999px;
+}
+
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.detail-tags .tag {
+  background: rgba(255, 255, 255, 0.22);
+  color: inherit;
+}
+
+.tag-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tag-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px 8px;
+}
+
+.tag-editor .tag {
+  background: var(--line);
+  color: var(--ink);
+}
+
+.tag-editor .tag button {
+  font: inherit;
+  color: var(--ink-soft);
+  background: none;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.form .tag-editor input {
+  flex: 1;
+  min-width: 130px;
+  border: none;
+  background: transparent;
+  padding: 4px;
+}

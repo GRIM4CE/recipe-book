@@ -32,7 +32,14 @@ for (const [name, color] of palette) {
   categories.set(name, cat.id);
 }
 
-const recipes = [
+const recipes: Array<{
+  title: string;
+  summary: string;
+  category: string;
+  ingredients: string[];
+  instructions: string[];
+  tags?: string[];
+}> = [
   {
     title: "Buttermilk Pancakes",
     summary: "Tall, fluffy weekend pancakes with crispy edges.",
@@ -58,6 +65,7 @@ const recipes = [
     title: "Sunday Bolognese",
     summary: "Slow-simmered ragù for a lazy afternoon.",
     category: "Dinner",
+    tags: ["Pasta", "Slow Cooked"],
     ingredients: [
       "1 lb ground beef",
       "1/2 lb ground pork",
@@ -176,6 +184,7 @@ const recipes = [
     title: "Garlic Smashed Potatoes",
     summary: "Boiled, smashed, and roasted until shatteringly crisp.",
     category: "Sides",
+    tags: ["Grill Out"],
     ingredients: [
       "1.5 lb baby potatoes",
       "4 tbsp olive oil",
@@ -200,6 +209,7 @@ for (const r of recipes) {
       ingredients: r.ingredients,
       instructions: r.instructions,
       categoryId: categories.get(r.category),
+      tags: r.tags,
     },
     { createdBy: "dev", source: "web" },
   );

@@ -12,6 +12,7 @@ const recipes = [
     ingredients: ['ground beef', 'tomatoes'],
     instructions: ['Simmer for hours.'],
     category: dinner,
+    tags: ['Pasta', 'Slow Cooked'],
   },
   {
     id: 2,
@@ -20,6 +21,7 @@ const recipes = [
     ingredients: ['gin', 'Campari', 'sweet vermouth'],
     instructions: ['Stir over ice.'],
     category: drinks,
+    tags: ['Slow Cooked'],
   },
   {
     id: 3,
@@ -58,5 +60,20 @@ describe('filterRecipes', () => {
 
   it('ignores surrounding whitespace in the query', () => {
     expect(filterRecipes(recipes, { query: '  stew  ' })).toEqual([recipes[2]]);
+  });
+
+  it('filters by tag, tolerating recipes without tags', () => {
+    expect(filterRecipes(recipes, { tag: 'Pasta' })).toEqual([recipes[0]]);
+    expect(filterRecipes(recipes, { tag: 'Slow Cooked' })).toEqual([
+      recipes[0],
+      recipes[1],
+    ]);
+  });
+
+  it('combines tag with category and query', () => {
+    expect(filterRecipes(recipes, { tag: 'Slow Cooked', categoryId: 2 })).toEqual([
+      recipes[1],
+    ]);
+    expect(filterRecipes(recipes, { tag: 'Pasta', query: 'gin' })).toEqual([]);
   });
 });

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 import { blobToBase64, downscaleToJpeg } from '../image.js';
-
 const lines = (text) =>
   text
     .split('\n')
@@ -9,10 +8,12 @@ const lines = (text) =>
     .filter(Boolean);
 
 // One line per ingredient/step: far friendlier on a phone than dynamic rows.
-export default function RecipeForm({ recipe, categories, onSaved }) {
+export default function RecipeForm({ recipe, categories, tagSuggestions = [], onSaved }) {
   const [title, setTitle] = useState(recipe?.title ?? '');
   const [summary, setSummary] = useState(recipe?.summary ?? '');
   const [categoryId, setCategoryId] = useState(recipe?.category?.id ?? '');
+  const [tags, setTags] = useState(recipe?.tags ?? []);
+  const [tagInput, setTagInput] = useState('');
   const [ingredients, setIngredients] = useState(
     recipe?.ingredients.join('\n') ?? '',
   );
@@ -84,6 +85,23 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
     }
   }
 
+  function addTag(raw) {
+    const tag = raw.trim();
+    if (tag && !tags.some((t) => t.toLowerCase() === tag.toLowerCase())) {
+      setTags([...tags, tag]);
+    }
+    setTagInput('');
+  }
+
+  function onTagKeyDown(e) {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addTag(tagInput);
+    } else if (e.key === 'Backspace' && !tagInput && tags.length > 0) {
+      setTags(tags.slice(0, -1));
+    }
+  }
+
   async function submit(e) {
     e.preventDefault();
     setBusy(true);
@@ -92,10 +110,17 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
       let photoKey = recipe?.photoKey ?? null;
       if (photoBlob === null) photoKey = null;
       else if (photoBlob) photoKey = await api.uploadPhoto(photoBlob);
+      // Include a tag still sitting in the input so "type and hit Save" works.
+      const pending = tagInput.trim();
+      const savedTags =
+        pending && !tags.some((t) => t.toLowerCase() === pending.toLowerCase())
+          ? [...tags, pending]
+          : tags;
       const data = {
         title,
         summary,
         categoryId: categoryId === '' ? null : Number(categoryId),
+        tags: savedTags,
         ingredients: lines(ingredients),
         instructions: lines(instructions),
         photoKey,
@@ -177,6 +202,41 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
           ))}
         </select>
       </label>
+      {/* Not a <label>: buttons are labelable, so a label would forward
+          stray clicks to the first chip's remove button. */}
+      <div className="tag-field">
+        <span className="field-title">
+          Tags <span className="hint-inline">press Enter after each</span>
+        </span>
+        <div className="tag-editor">
+          {tags.map((t) => (
+            <span key={t} className="tag">
+              {t}
+              <button
+                type="button"
+                aria-label={`Remove tag ${t}`}
+                onClick={() => setTags(tags.filter((x) => x !== t))}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          <input
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={onTagKeyDown}
+            list="tag-suggestions"
+            placeholder={tags.length === 0 ? 'e.g. Wing Sauces' : ''}
+          />
+          <datalist id="tag-suggestions">
+            {tagSuggestions
+              .filter((s) => !tags.some((t) => t.toLowerCase() === s.toLowerCase()))
+              .map((s) => (
+                <option key={s} value={s} />
+              ))}
+          </datalist>
+        </div>
+      </div>
       <div className="photo-field">
         <span className="field-title">Photo</span>
         {photoPreview && <img className="photo-preview" src={photoPreview} alt="" />}

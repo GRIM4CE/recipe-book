@@ -5,7 +5,11 @@ import RecipeCard from './RecipeCard.jsx';
 export default function RecipeGrid({ recipes, categories }) {
   const [query, setQuery] = useState('');
   const [categoryId, setCategoryId] = useState(null);
-  const visible = filterRecipes(recipes, { query, categoryId });
+  const [tag, setTag] = useState(null);
+  const tagNames = [...new Set(recipes.flatMap((r) => r.tags ?? []))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+  const visible = filterRecipes(recipes, { query, categoryId, tag });
 
   return (
     <div className="grid-page">
@@ -37,6 +41,21 @@ export default function RecipeGrid({ recipes, categories }) {
           </button>
         ))}
       </div>
+      {tagNames.length > 0 && (
+        <div className="chips tag-chips" role="tablist">
+          {tagNames.map((t) => (
+            <button
+              key={t}
+              type="button"
+              className={tag === t ? 'chip active' : 'chip'}
+              style={{ '--chip-color': '#8b8378' }}
+              onClick={() => setTag(tag === t ? null : t)}
+            >
+              #{t}
+            </button>
+          ))}
+        </div>
+      )}
       {visible.length === 0 ? (
         <p className="notice">No recipes match. Time to invent one?</p>
       ) : (
