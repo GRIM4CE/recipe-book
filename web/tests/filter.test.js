@@ -92,3 +92,64 @@ describe('filterRecipes', () => {
     expect(filterRecipes(recipes, { ingredient: 'gin', tag: 'Pasta' })).toEqual([]);
   });
 });
+
+describe('fuzzy and synonym search', () => {
+  const items = [
+    {
+      id: 1,
+      title: 'Whiskey Sour',
+      summary: '',
+      ingredients: ['2 oz bourbon', '3/4 oz lemon juice'],
+      instructions: ['Shake with ice.'],
+      category: null,
+    },
+    {
+      id: 2,
+      title: 'Classic Negroni',
+      summary: '',
+      ingredients: ['1 oz gin', '1 oz Campari'],
+      instructions: ['Stir over ice.'],
+      category: null,
+    },
+    {
+      id: 3,
+      title: 'Sunday Bolognese',
+      summary: 'Slow ragu.',
+      ingredients: ['1 lb ground beef'],
+      instructions: ['Simmer for hours.'],
+      category: null,
+    },
+  ];
+  const ids = (opts) => filterRecipes(items, opts).map((r) => r.id);
+
+  it('tolerates spelling variants: whisky finds Whiskey Sour', () => {
+    expect(ids({ query: 'whisky' })).toEqual([1]);
+  });
+
+  it('tolerates single-typo misspellings', () => {
+    expect(ids({ query: 'negoni' })).toEqual([2]); // dropped an r
+    expect(ids({ query: 'bolonese' })).toEqual([3]); // dropped a g
+  });
+
+  it('matches synonyms: whisky finds a recipe that only says bourbon', () => {
+    const onlyBourbon = [
+      { ...items[0], title: 'Old Fashioned', ingredients: ['2 oz bourbon', 'bitters'] },
+    ];
+    expect(filterRecipes(onlyBourbon, { query: 'whisky' })).toHaveLength(1);
+  });
+
+  it('keeps short words exact so noise stays out', () => {
+    // "rice" (4 chars) must not fuzzily pull in "ice" / unrelated recipes.
+    expect(ids({ query: 'rice' })).toEqual([]);
+  });
+
+  it('requires every query word to match (AND)', () => {
+    expect(ids({ query: 'sour whiskey' })).toEqual([1]);
+    expect(ids({ query: 'sour gin' })).toEqual([]);
+  });
+
+  it('does not match unrelated recipes on a fuzzy query', () => {
+    expect(ids({ query: 'whisky' })).not.toContain(2);
+    expect(ids({ query: 'whisky' })).not.toContain(3);
+  });
+});
