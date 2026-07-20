@@ -430,6 +430,17 @@ body {
   background: var(--paper);
 }
 
+.import-url-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.import-url-row input {
+  flex: 1;
+  min-width: 0;
+}
+
 .login-form {
   max-width: 380px;
   padding-top: 24px;
