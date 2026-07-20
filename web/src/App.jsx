@@ -6,6 +6,7 @@ import Login from './components/Login.jsx';
 import RecipeDetail from './components/RecipeDetail.jsx';
 import RecipeForm from './components/RecipeForm.jsx';
 import RecipeGrid from './components/RecipeGrid.jsx';
+import Settings from './components/Settings.jsx';
 
 // Hash routing keeps the SPA deployable without rewrite rules: the path after
 // '#' is the route, e.g. #/recipes/12.
@@ -122,6 +123,12 @@ export default function App() {
     ) : (
       <Login onLogin={setUser} />
     );
+  } else if (route === '/settings') {
+    page = user ? (
+      <Settings user={user} onSignOut={signOut} />
+    ) : (
+      <Login onLogin={setUser} />
+    );
   } else if (detailMatch) {
     const recipe = findRecipe(detailMatch[1]);
     page = recipe ? (
@@ -142,9 +149,11 @@ export default function App() {
             <>
               <a className="btn primary small" href="#/new">+ Recipe</a>
               <a className="btn ghost small" href="#/categories">Categories</a>
-              <button className="btn ghost small" type="button" onClick={signOut}>
-                Sign out
-              </button>
+              <a className="icon-btn" href="#/settings" aria-label="Settings" title="Settings">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                  <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
+                </svg>
+              </a>
             </>
           ) : showSignIn ? (
             <a className="btn ghost small" href="#/login">Sign in</a>
