@@ -80,7 +80,7 @@ describe("recipes", () => {
     expect(fetched).toEqual(created);
   });
 
-  it("embeds a null category when unset and lists newest first", async () => {
+  it("embeds a null category when unset and lists recipes alphabetically", async () => {
     const uncategorized = await db.createRecipe(
       { title: "Mystery Stew" },
       { createdBy: "importer", source: "import" },
@@ -88,8 +88,13 @@ describe("recipes", () => {
     expect(uncategorized.category).toBeNull();
     expect(uncategorized.source).toBe("import");
 
-    const all = await db.listRecipes();
-    expect(all.some((r) => r.id === uncategorized.id)).toBe(true);
+    await db.createRecipe({ title: "apple crumble" }, { createdBy: "dev", source: "web" });
+    await db.createRecipe({ title: "Zucchini Bread" }, { createdBy: "dev", source: "web" });
+    await db.createRecipe({ title: "Banana Bread" }, { createdBy: "dev", source: "web" });
+
+    const titles = (await db.listRecipes()).map((r) => r.title);
+    const sorted = [...titles].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    expect(titles).toEqual(sorted);
   });
 
   it("updates in place and hard-deletes", async () => {
