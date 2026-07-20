@@ -18,7 +18,7 @@ function rowToCategory(row: Row): Category {
   };
 }
 
-function rowToRecipe(row: Row): Recipe {
+function rowToRecipe(row: Row, tags: string[]): Recipe {
   return {
     id: Number(row.id),
     title: String(row.title),
@@ -34,6 +34,7 @@ function rowToRecipe(row: Row): Recipe {
             color: String(row.c_color),
             createdAt: String(row.c_created_at),
           },
+    tags,
     photoKey: row.photo_key == null ? null : String(row.photo_key),
     createdBy: String(row.created_by),
     source: String(row.source) as RecipeSource,
@@ -49,6 +50,46 @@ const RECIPE_SELECT = `
 `;
 
 export function createDb(client: Client) {
+  // Tags are created on the fly: each name is matched case-insensitively
+  // against existing tags and inserted only when new.
+  async function setRecipeTags(recipeId: number, names: string[]): Promise<void> {
+    await client.execute({
+      sql: "DELETE FROM recipe_tags WHERE recipe_id = ?",
+      args: [recipeId],
+    });
+    for (const name of names) {
+      const found = await client.execute({
+        sql: "SELECT id FROM tags WHERE name = ? COLLATE NOCASE",
+        args: [name],
+      });
+      let tagId = found.rows[0] ? Number(found.rows[0].id) : null;
+      if (tagId == null) {
+        const inserted = await client.execute({
+          sql: "INSERT INTO tags (name, created_at) VALUES (?, ?)",
+          args: [name, new Date().toISOString()],
+        });
+        tagId = Number(inserted.lastInsertRowid);
+      }
+      await client.execute({
+        sql: "INSERT OR IGNORE INTO recipe_tags (recipe_id, tag_id) VALUES (?, ?)",
+        args: [recipeId, tagId],
+      });
+    }
+  }
+
+  async function tagsByRecipe(): Promise<Map<number, string[]>> {
+    const rs = await client.execute(
+      `SELECT rt.recipe_id, t.name FROM recipe_tags rt
+       JOIN tags t ON rt.tag_id = t.id ORDER BY t.name COLLATE NOCASE`,
+    );
+    const map = new Map<number, string[]>();
+    for (const row of rs.rows) {
+      const id = Number(row.recipe_id);
+      map.set(id, [...(map.get(id) ?? []), String(row.name)]);
+    }
+    return map;
+  }
+
   return {
     async applySchema(): Promise<void> {
       await client.executeMultiple(SCHEMA);
@@ -111,7 +152,8 @@ export function createDb(client: Client) {
 
     async listRecipes(): Promise<Recipe[]> {
       const rs = await client.execute(`${RECIPE_SELECT} ORDER BY r.created_at DESC`);
-      return rs.rows.map(rowToRecipe);
+      const tags = await tagsByRecipe();
+      return rs.rows.map((row) => rowToRecipe(row, tags.get(Number(row.id)) ?? []));
     },
 
     async getRecipe(id: number): Promise<Recipe | null> {
@@ -119,7 +161,16 @@ export function createDb(client: Client) {
         sql: `${RECIPE_SELECT} WHERE r.id = ?`,
         args: [id],
       });
-      return rs.rows[0] ? rowToRecipe(rs.rows[0]) : null;
+      if (!rs.rows[0]) return null;
+      const tags = await client.execute({
+        sql: `SELECT t.name FROM recipe_tags rt JOIN tags t ON rt.tag_id = t.id
+              WHERE rt.recipe_id = ? ORDER BY t.name COLLATE NOCASE`,
+        args: [id],
+      });
+      return rowToRecipe(
+        rs.rows[0],
+        tags.rows.map((r) => String(r.name)),
+      );
     },
 
     async createRecipe(input: RecipeInput, meta: RecipeMeta): Promise<Recipe> {
@@ -142,7 +193,9 @@ export function createDb(client: Client) {
           now,
         ],
       });
-      return (await this.getRecipe(Number(rs.lastInsertRowid))) as Recipe;
+      const id = Number(rs.lastInsertRowid);
+      if (input.tags?.length) await setRecipeTags(id, input.tags);
+      return (await this.getRecipe(id)) as Recipe;
     },
 
     async updateRecipe(id: number, input: RecipeInput): Promise<Recipe | null> {
@@ -162,10 +215,15 @@ export function createDb(client: Client) {
         ],
       });
       if (rs.rowsAffected === 0) return null;
+      await setRecipeTags(id, input.tags ?? []);
       return this.getRecipe(id);
     },
 
     async deleteRecipe(id: number): Promise<boolean> {
+      await client.execute({
+        sql: "DELETE FROM recipe_tags WHERE recipe_id = ?",
+        args: [id],
+      });
       const rs = await client.execute({
         sql: "DELETE FROM recipes WHERE id = ?",
         args: [id],

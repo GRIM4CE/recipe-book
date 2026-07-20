@@ -22,4 +22,16 @@ CREATE TABLE IF NOT EXISTS recipes (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS tags (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS recipe_tags (
+  recipe_id INTEGER NOT NULL REFERENCES recipes(id),
+  tag_id INTEGER NOT NULL REFERENCES tags(id),
+  PRIMARY KEY (recipe_id, tag_id)
+);
 `;

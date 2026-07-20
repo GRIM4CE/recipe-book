@@ -81,6 +81,10 @@ export default function App() {
   const showSignIn =
     devMode || hasDevicePasskey() || window.matchMedia('(display-mode: standalone)').matches;
 
+  const tagSuggestions = [...new Set((recipes ?? []).flatMap((r) => r.tags ?? []))].sort(
+    (a, b) => a.localeCompare(b),
+  );
+
   const detailMatch = route.match(/^\/recipes\/(\d+)$/);
   const editMatch = route.match(/^\/recipes\/(\d+)\/edit$/);
   const findRecipe = (id) => recipes?.find((r) => r.id === Number(id));
@@ -94,7 +98,7 @@ export default function App() {
     page = <p className="notice">Loading…</p>;
   } else if (route === '/new') {
     page = user ? (
-      <RecipeForm categories={categories} onSaved={onSaved} />
+      <RecipeForm categories={categories} tagSuggestions={tagSuggestions} onSaved={onSaved} />
     ) : (
       <Login onLogin={setUser} />
     );
@@ -103,7 +107,12 @@ export default function App() {
     page = !user ? (
       <Login onLogin={setUser} />
     ) : recipe ? (
-      <RecipeForm recipe={recipe} categories={categories} onSaved={onSaved} />
+      <RecipeForm
+        recipe={recipe}
+        categories={categories}
+        tagSuggestions={tagSuggestions}
+        onSaved={onSaved}
+      />
     ) : (
       <p className="notice">That recipe doesn’t exist (anymore).</p>
     );

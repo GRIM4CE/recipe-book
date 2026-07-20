@@ -14,6 +14,15 @@ export default function RecipeDetail({ recipe, canEdit, onDelete }) {
         {recipe.category && (
           <span className="card-category">{recipe.category.name}</span>
         )}
+        {recipe.tags?.length > 0 && (
+          <div className="detail-tags">
+            {recipe.tags.map((t) => (
+              <span key={t} className="tag">
+                #{t}
+              </span>
+            ))}
+          </div>
+        )}
         {recipe.summary && <p className="detail-summary">{recipe.summary}</p>}
         {recipe.photoUrl && (
           <img className="detail-photo" src={recipe.photoUrl} alt={recipe.title} />

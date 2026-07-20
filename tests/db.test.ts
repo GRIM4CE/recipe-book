@@ -114,3 +114,54 @@ describe("recipes", () => {
     expect(await db.updateRecipe(99_999, { title: "Ghost" })).toBeNull();
   });
 });
+
+describe("tags", () => {
+  it("creates tags on the fly and round-trips them", async () => {
+    const created = await db.createRecipe(
+      { title: "Buffalo Sauce", tags: ["Wing Sauces", "Grill Out"] },
+      { createdBy: "dev", source: "web" },
+    );
+    expect(created.tags).toEqual(["Grill Out", "Wing Sauces"]);
+
+    const listed = await db.listRecipes();
+    expect(listed.find((r) => r.id === created.id)?.tags).toEqual([
+      "Grill Out",
+      "Wing Sauces",
+    ]);
+  });
+
+  it("reuses existing tags case-insensitively", async () => {
+    const other = await db.createRecipe(
+      { title: "Honey Garlic Sauce", tags: ["wing sauces"] },
+      { createdBy: "dev", source: "web" },
+    );
+    // Keeps the spelling of the first recipe that created the tag.
+    expect(other.tags).toEqual(["Wing Sauces"]);
+  });
+
+  it("replaces tags on update and clears them when omitted", async () => {
+    const created = await db.createRecipe(
+      { title: "Ribs", tags: ["Grill Out"] },
+      { createdBy: "dev", source: "web" },
+    );
+    const retagged = await db.updateRecipe(created.id, {
+      title: "Ribs",
+      tags: ["Smoker"],
+    });
+    expect(retagged?.tags).toEqual(["Smoker"]);
+
+    const cleared = await db.updateRecipe(created.id, { title: "Ribs" });
+    expect(cleared?.tags).toEqual([]);
+  });
+
+  it("removes tag links when the recipe is deleted", async () => {
+    const created = await db.createRecipe(
+      { title: "Doomed", tags: ["Ephemeral"] },
+      { createdBy: "dev", source: "web" },
+    );
+    expect(await db.deleteRecipe(created.id)).toBe(true);
+    expect((await db.listRecipes()).flatMap((r) => r.tags)).not.toContain(
+      "Ephemeral",
+    );
+  });
+});
