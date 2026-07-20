@@ -75,6 +75,12 @@ export default function App() {
     window.location.hash = '#/';
   }
 
+  // The sign-in link renders only where the owner plausibly is: local dev, the
+  // installed PWA, or a browser that has already used a passkey. Visitors never
+  // see it; a fresh browser can still reach #/login by typing the URL.
+  const showSignIn =
+    devMode || hasDevicePasskey() || window.matchMedia('(display-mode: standalone)').matches;
+
   const detailMatch = route.match(/^\/recipes\/(\d+)$/);
   const editMatch = route.match(/^\/recipes\/(\d+)\/edit$/);
   const findRecipe = (id) => recipes?.find((r) => r.id === Number(id));
@@ -131,9 +137,9 @@ export default function App() {
                 Sign out
               </button>
             </>
-          ) : (
+          ) : showSignIn ? (
             <a className="btn ghost small" href="#/login">Sign in</a>
-          )}
+          ) : null}
         </nav>
       </header>
       <main>
