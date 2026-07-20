@@ -33,43 +33,66 @@ export interface Extractor {
   extract(input: ExtractInput): Promise<ExtractionResult>;
 }
 
-// Strict response schema; found:false is the model's clean way of saying
-// "this input isn't a recipe" instead of hallucinating fields.
-const RECIPE_SCHEMA = {
+// Strict response schema. pageUnreadable distinguishes "couldn't fetch the
+// page" from "page had no recipes" so the route can give copy-paste guidance.
+const RESULT_SCHEMA = {
   type: "object",
   properties: {
-    title: { type: "string" },
-    summary: { type: "string", description: "one short line about the dish" },
-    ingredients: { type: "array", items: { type: "string" } },
-    instructions: { type: "array", items: { type: "string" } },
-    category: {
-      anyOf: [{ type: "string" }, { type: "null" }],
-      description: "one of the provided category names, or null",
+    pageUnreadable: {
+      type: "boolean",
+      description:
+        "true only when a URL was provided and its content could not be retrieved",
+    },
+    recipes: {
+      type: "array",
+      description: "every distinct recipe found; empty when there are none",
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          summary: {
+            type: "string",
+            description: "one short line about the dish",
+          },
+          ingredients: { type: "array", items: { type: "string" } },
+          instructions: { type: "array", items: { type: "string" } },
+          category: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description: "one of the provided category names, or null",
+          },
+        },
+        required: [
+          "title",
+          "summary",
+          "ingredients",
+          "instructions",
+          "category",
+        ],
+        additionalProperties: false,
+      },
     },
   },
-  required: [
-    "title",
-    "summary",
-    "ingredients",
-    "instructions",
-    "category",
-  ],
+  required: ["pageUnreadable", "recipes"],
   additionalProperties: false,
 };
 
 function buildPrompt(input: ExtractInput): string {
   const source = input.image
     ? "Read the recipe in the attached image (it may be handwritten, a cookbook page, or a screenshot)."
-    : "Extract the recipe from the text below.";
+    : input.url
+      ? `Fetch this page and extract every distinct recipe on it: ${input.url}`
+      : "Extract every distinct recipe from the text below.";
   return [
-    "Extract this recipe into structured data for a recipe app.",
+    "Extract recipes into structured data for a recipe app.",
     source,
     "Rules:",
+    "- one entry per distinct recipe; variations of the same dish are one recipe.",
     "- ingredients: one entry per ingredient, quantities as written.",
     "- instructions: one entry per step, without step numbers.",
     "- summary: one short line describing the dish.",
-    `- category: the best fit among [${input.categoryNames.join(", ")}], or null if none fits.`,
-    "- If the input does not contain a recipe, set found to false and leave every other field empty.",
+    `- category: per recipe, the best fit among [${input.categoryNames.join(", ")}], or null if none fits.`,
+    "- If the input contains no recipe, return an empty recipes array.",
+    "- Set pageUnreadable to true only when a URL was provided and you could not retrieve its content; otherwise false.",
     ...(input.text ? ["", input.text] : []),
   ].join("\n");
 }
@@ -86,18 +109,44 @@ export function createClaudeExtractor(opts: { apiKey: string }): Extractor {
         });
       }
       content.push({ type: "text", text: buildPrompt(input) });
-      const response = await client.messages.create({
+
+      const base = {
         model: "claude-opus-4-8",
         max_tokens: 16000,
-        thinking: { type: "adaptive" },
+        thinking: { type: "adaptive" as const },
         output_config: {
-          format: { type: "json_schema", schema: RECIPE_SCHEMA },
+          format: { type: "json_schema" as const, schema: RESULT_SCHEMA },
         },
-        messages: [{ role: "user", content }],
-      });
-      const text = response.content.find(
-        (b): b is Anthropic.TextBlock => b.type === "text",
-      );
+        ...(input.url
+          ? {
+              tools: [
+                {
+                  type: "web_fetch_20260209" as const,
+                  name: "web_fetch" as const,
+                  max_uses: 3,
+                  allowed_domains: [new URL(input.url).hostname],
+                },
+              ],
+            }
+          : {}),
+      };
+
+      const messages: Anthropic.MessageParam[] = [{ role: "user", content }];
+      let response = await client.messages.create({ ...base, messages });
+      // Server-tool turns can pause mid-loop; append the assistant turn and
+      // re-send to resume, bounded so a wedged loop becomes a 502.
+      for (let i = 0; i < 5 && response.stop_reason === "pause_turn"; i++) {
+        messages.push({ role: "assistant", content: response.content });
+        response = await client.messages.create({ ...base, messages });
+      }
+      if (response.stop_reason === "pause_turn") {
+        throw new Error("extraction did not finish (pause_turn limit)");
+      }
+      // With server tools the transcript interleaves tool blocks; the JSON
+      // answer is the LAST text block.
+      const text = [...response.content]
+        .reverse()
+        .find((b): b is Anthropic.TextBlock => b.type === "text");
       if (!text) {
         throw new Error(
           `no text block in response (stop_reason: ${response.stop_reason})`,

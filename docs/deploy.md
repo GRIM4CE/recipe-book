@@ -207,6 +207,7 @@ dropped, not created.
 - [ ] `POST /api/external/recipes` with a wrong secret → 401; right secret → recipe appears
 - [ ] Install the PWA on both phones (Share → Add to Home Screen)
 - [ ] New Recipe → paste recipe text → Extract prefills the form (proves ANTHROPIC_API_KEY)
+- [ ] New Recipe → paste a recipe-site URL → Extract prefills (or picker for several); a Claude share link either extracts or shows the copy-paste guidance
 
 ## Notes
 

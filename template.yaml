@@ -36,7 +36,7 @@ Resources:
       Runtime: nodejs22.x
       Architectures: [arm64]
       MemorySize: 512
-      Timeout: 15
+      Timeout: 60
       # CORS stays unset here on purpose: Express handles it. Both set would
       # emit duplicate headers and browsers reject the response.
       FunctionUrlConfig:
