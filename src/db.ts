@@ -26,6 +26,7 @@ function rowToRecipe(row: Row, tags: string[]): Recipe {
     servings: row.servings == null ? "" : String(row.servings),
     ingredients: JSON.parse(String(row.ingredients)),
     instructions: JSON.parse(String(row.instructions)),
+    notes: row.notes == null ? "" : String(row.notes),
     category:
       row.c_id == null
         ? null
@@ -95,13 +96,18 @@ export function createDb(client: Client) {
     async applySchema(): Promise<void> {
       await client.executeMultiple(SCHEMA);
       // CREATE TABLE IF NOT EXISTS won't add columns to databases created
-      // before servings existed, so patch those in place.
+      // before these columns existed, so patch those in place.
       const cols = await client.execute(
         "SELECT name FROM pragma_table_info('recipes')",
       );
       if (!cols.rows.some((r) => r.name === "servings")) {
         await client.execute(
           "ALTER TABLE recipes ADD COLUMN servings TEXT NOT NULL DEFAULT ''",
+        );
+      }
+      if (!cols.rows.some((r) => r.name === "notes")) {
+        await client.execute(
+          "ALTER TABLE recipes ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
         );
       }
     },
@@ -188,15 +194,16 @@ export function createDb(client: Client) {
       const now = new Date().toISOString();
       const rs = await client.execute({
         sql: `INSERT INTO recipes
-          (title, summary, servings, ingredients, instructions, category_id,
+          (title, summary, servings, ingredients, instructions, notes, category_id,
            photo_key, created_by, source, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           input.title,
           input.summary ?? "",
           input.servings ?? "",
           JSON.stringify(input.ingredients ?? []),
           JSON.stringify(input.instructions ?? []),
+          input.notes ?? "",
           input.categoryId ?? null,
           input.photoKey ?? null,
           meta.createdBy,
@@ -213,7 +220,7 @@ export function createDb(client: Client) {
     async updateRecipe(id: number, input: RecipeInput): Promise<Recipe | null> {
       const rs = await client.execute({
         sql: `UPDATE recipes SET title = ?, summary = ?, servings = ?,
-          ingredients = ?, instructions = ?, category_id = ?, photo_key = ?,
+          ingredients = ?, instructions = ?, notes = ?, category_id = ?, photo_key = ?,
           updated_at = ? WHERE id = ?`,
         args: [
           input.title,
@@ -221,6 +228,7 @@ export function createDb(client: Client) {
           input.servings ?? "",
           JSON.stringify(input.ingredients ?? []),
           JSON.stringify(input.instructions ?? []),
+          input.notes ?? "",
           input.categoryId ?? null,
           input.photoKey ?? null,
           new Date().toISOString(),

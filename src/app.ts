@@ -65,6 +65,9 @@ function parseRecipeInput(body: unknown): RecipeInput | string {
   if (b.servings !== undefined && typeof b.servings !== "string") {
     return "servings must be a string";
   }
+  if (b.notes !== undefined && typeof b.notes !== "string") {
+    return "notes must be a string";
+  }
   if (
     b.categoryId !== undefined &&
     b.categoryId !== null &&
@@ -90,6 +93,7 @@ function parseRecipeInput(body: unknown): RecipeInput | string {
     title: b.title.trim(),
     summary: (b.summary as string | undefined)?.trim() ?? "",
     servings: (b.servings as string | undefined)?.trim() ?? "",
+    notes: (b.notes as string | undefined)?.trim() ?? "",
     ingredients: ((b.ingredients as string[] | undefined) ?? []).filter((s) =>
       s.trim(),
     ),
