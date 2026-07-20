@@ -12,6 +12,7 @@ const lines = (text) =>
 export default function RecipeForm({ recipe, categories, onSaved }) {
   const [title, setTitle] = useState(recipe?.title ?? '');
   const [summary, setSummary] = useState(recipe?.summary ?? '');
+  const [servings, setServings] = useState(recipe?.servings ?? '');
   const [categoryId, setCategoryId] = useState(recipe?.category?.id ?? '');
   const [ingredients, setIngredients] = useState(
     recipe?.ingredients.join('\n') ?? '',
@@ -56,6 +57,7 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
       const extracted = await api.extractRecipe(payload);
       setTitle(extracted.title);
       setSummary(extracted.summary);
+      setServings(extracted.servings ?? '');
       setCategoryId(extracted.categoryId ?? '');
       setIngredients(extracted.ingredients.join('\n'));
       setInstructions(extracted.instructions.join('\n'));
@@ -95,6 +97,7 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
       const data = {
         title,
         summary,
+        servings: servings.trim(),
         categoryId: categoryId === '' ? null : Number(categoryId),
         ingredients: lines(ingredients),
         instructions: lines(instructions),
@@ -164,6 +167,14 @@ export default function RecipeForm({ recipe, categories, onSaved }) {
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
           placeholder="One line about this recipe"
+        />
+      </label>
+      <label>
+        Servings
+        <input
+          value={servings}
+          onChange={(e) => setServings(e.target.value)}
+          placeholder="e.g. 4"
         />
       </label>
       <label>

@@ -37,10 +37,12 @@ describe("recipes", () => {
     const created = await request(app).post("/api/recipes").send({
       title: "Pancakes",
       summary: "Fluffy.",
+      servings: "4",
       ingredients: ["flour", "eggs"],
       instructions: ["mix", "fry"],
     });
     expect(created.status).toBe(201);
+    expect(created.body.servings).toBe("4");
     expect(created.body.createdBy).toBe("dev");
     expect(created.body.source).toBe("web");
     expect(created.body.photoUrl).toBeNull();
@@ -68,6 +70,13 @@ describe("recipes", () => {
       (
         await request(app)
           .post("/api/recipes")
+          .send({ title: "X", servings: 4 })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post("/api/recipes")
           .send({ title: "X", categoryId: 999 })
       ).status,
     ).toBe(400);
@@ -81,9 +90,10 @@ describe("recipes", () => {
 
     const updated = await request(app)
       .put(`/api/recipes/${id}`)
-      .send({ title: "French Toast", ingredients: ["bread", "eggs"] });
+      .send({ title: "French Toast", servings: "2", ingredients: ["bread", "eggs"] });
     expect(updated.status).toBe(200);
     expect(updated.body.title).toBe("French Toast");
+    expect(updated.body.servings).toBe("2");
 
     expect((await request(app).delete(`/api/recipes/${id}`)).status).toBe(204);
     expect((await request(app).get(`/api/recipes/${id}`)).status).toBe(404);
@@ -91,6 +101,33 @@ describe("recipes", () => {
       404,
     );
     expect((await request(app).delete(`/api/recipes/${id}`)).status).toBe(404);
+  });
+});
+
+describe("schema migration", () => {
+  it("adds the servings column to a database created before it existed", async () => {
+    const old = createClient({ url: `file:${join(dir, "old.db")}` });
+    await old.execute(`CREATE TABLE recipes (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      summary TEXT NOT NULL DEFAULT '',
+      ingredients TEXT NOT NULL DEFAULT '[]',
+      instructions TEXT NOT NULL DEFAULT '[]',
+      category_id INTEGER,
+      photo_key TEXT,
+      created_by TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'web',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`);
+    const oldDb = createDb(old);
+    await oldDb.applySchema();
+    const recipe = await oldDb.createRecipe(
+      { title: "Old", servings: "3" },
+      { createdBy: "dev", source: "web" },
+    );
+    expect(recipe.servings).toBe("3");
+    old.close();
   });
 });
 
