@@ -86,15 +86,17 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
   }
 
   async function importFromPhoto(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
     e.target.value = '';
     setImporting(true);
     setError(null);
     try {
-      const blob = await downscaleToJpeg(file);
-      const image = await blobToBase64(blob);
-      await runImport({ image, mediaType: 'image/jpeg' });
+      // Read every picked photo together — pages of one recipe or a batch.
+      const images = await Promise.all(
+        files.map(async (file) => blobToBase64(await downscaleToJpeg(file))),
+      );
+      await runImport({ images, mediaType: 'image/jpeg' });
     } catch (err) {
       setError(err.message);
       setImporting(false);
@@ -224,10 +226,11 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
                 {importing ? 'Reading recipe…' : 'Extract from text'}
               </button>
               <label className="btn ghost small">
-                {importing ? 'Reading recipe…' : 'Extract from photo'}
+                {importing ? 'Reading recipe…' : 'Extract from photos'}
                 <input
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={importFromPhoto}
                   hidden
                   disabled={importing}
