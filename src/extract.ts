@@ -16,7 +16,8 @@ export interface ExtractInput {
 export interface ExtractedRecipe {
   title: string;
   summary: string;
-  // Servings/yield as written (e.g. "4" or "Makes 12"), "" if not stated.
+  // Servings/yield as written (e.g. "4" or "Makes 12"); an estimate when not
+  // stated, and "1" for cocktails unless a different yield is stated.
   servings: string;
   ingredients: string[];
   instructions: string[];
@@ -59,7 +60,7 @@ const RESULT_SCHEMA = {
           servings: {
             type: "string",
             description:
-              'servings or yield as written (e.g. "4" or "Makes 12"), empty if not stated',
+              'servings or yield as written (e.g. "4" or "Makes 12"); when not stated, an estimate from the ingredient quantities. For a cocktail, "1" unless a different yield is stated. Never empty.',
           },
           ingredients: { type: "array", items: { type: "string" } },
           instructions: { type: "array", items: { type: "string" } },
@@ -84,7 +85,7 @@ const RESULT_SCHEMA = {
   additionalProperties: false,
 };
 
-function buildPrompt(input: ExtractInput): string {
+export function buildPrompt(input: ExtractInput): string {
   const source = input.image
     ? "Read the recipe in the attached image (it may be handwritten, a cookbook page, or a screenshot)."
     : input.url
@@ -98,7 +99,7 @@ function buildPrompt(input: ExtractInput): string {
     "- ingredients: one entry per ingredient, quantities as written.",
     "- instructions: one entry per step, without step numbers.",
     "- summary: one short line describing the dish.",
-    '- servings: how many the recipe serves or yields, as written (e.g. "4" or "Makes 12"); empty if not stated.',
+    '- servings: how many the recipe serves or yields, as written (e.g. "4" or "Makes 12"). If not stated, estimate a reasonable number from the ingredient quantities and typical portion sizes. For cocktails and other single-drink recipes, use "1" unless a different yield is stated. Never leave this empty.',
     `- category: per recipe, the best fit among [${input.categoryNames.join(", ")}], or null if none fits.`,
     "- If the input contains no recipe, return an empty recipes array.",
     "- Set pageUnreadable to true only when a URL was provided and you could not retrieve its content; otherwise false.",

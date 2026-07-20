@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import type { TokenVerifier } from "../src/auth.js";
 import { createDb, type Db } from "../src/db.js";
+import { buildPrompt } from "../src/extract.js";
 import type {
   ExtractInput,
   ExtractionResult,
@@ -186,5 +187,21 @@ describe("POST /api/extract", () => {
     });
     const res = await request(app).post("/api/extract").send({ text: "x" });
     expect(res.status).toBe(502);
+  });
+});
+
+describe("buildPrompt servings guidance", () => {
+  const prompt = buildPrompt({ text: "some recipe", categoryNames: [] });
+
+  it("instructs estimating servings when not stated", () => {
+    expect(prompt).toMatch(/If not stated, estimate/);
+  });
+
+  it("defaults cocktails to a single serving", () => {
+    expect(prompt).toMatch(/cocktails[\s\S]*use "1"/);
+  });
+
+  it("never leaves servings empty", () => {
+    expect(prompt).toContain("Never leave this empty.");
   });
 });
