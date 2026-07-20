@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { scaleIngredient, scaleServings } from '../scale.js';
+import RichText from './RichText.jsx';
 
 const SCALES = [
   { label: '⅛×', factor: 1 / 8 },
@@ -11,7 +12,7 @@ const SCALES = [
   { label: '8×', factor: 8 },
 ];
 
-export default function RecipeDetail({ recipe, canEdit }) {
+export default function RecipeDetail({ recipe, recipes = [], canEdit }) {
   const [factor, setFactor] = useState(1);
   const [shareNote, setShareNote] = useState('');
   const color = recipe.category?.color ?? '#8b8378';
@@ -118,7 +119,9 @@ export default function RecipeDetail({ recipe, canEdit }) {
           <h3>Instructions</h3>
           <ol className="instructions">
             {recipe.instructions.map((step, i) => (
-              <li key={i}>{step}</li>
+              <li key={i}>
+                <RichText text={step} recipes={recipes} excludeId={recipe.id} />
+              </li>
             ))}
           </ol>
         </section>
@@ -127,7 +130,9 @@ export default function RecipeDetail({ recipe, canEdit }) {
       {recipe.notes && (
         <section className="detail-section">
           <h3>Notes</h3>
-          <p className="notes">{recipe.notes}</p>
+          <p className="notes">
+            <RichText text={recipe.notes} recipes={recipes} excludeId={recipe.id} />
+          </p>
         </section>
       )}
 
