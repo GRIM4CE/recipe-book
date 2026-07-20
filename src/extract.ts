@@ -5,8 +5,9 @@ import Anthropic from "@anthropic-ai/sdk";
 // uses the Claude-backed implementation (added in the next task).
 export interface ExtractInput {
   text?: string;
-  // Base64 JPEG bytes (no data: prefix).
-  image?: string;
+  // One or more base64 JPEG images (no data: prefix). Multiple images are read
+  // together as one source — e.g. pages of the same recipe, or a batch to scan.
+  images?: string[];
   // Absolute http(s) URL to fetch and extract from.
   url?: string;
   // Existing category names so the model picks one of ours or none.
@@ -95,8 +96,10 @@ const RESULT_SCHEMA = {
 };
 
 export function buildPrompt(input: ExtractInput): string {
-  const source = input.image
-    ? "Read the recipe in the attached image (it may be handwritten, a cookbook page, or a screenshot)."
+  const source = input.images?.length
+    ? input.images.length > 1
+      ? "Read the recipe(s) from the attached images (handwritten, cookbook pages, or screenshots). Multiple images may be pages of one recipe or several separate recipes."
+      : "Read the recipe in the attached image (it may be handwritten, a cookbook page, or a screenshot)."
     : input.url
       ? `Fetch this page and extract every distinct recipe on it: ${input.url}`
       : "Extract every distinct recipe from the text below.";
@@ -122,10 +125,10 @@ export function createClaudeExtractor(opts: { apiKey: string }): Extractor {
   return {
     async extract(input) {
       const content: Anthropic.ContentBlockParam[] = [];
-      if (input.image) {
+      for (const image of input.images ?? []) {
         content.push({
           type: "image",
-          source: { type: "base64", media_type: "image/jpeg", data: input.image },
+          source: { type: "base64", media_type: "image/jpeg", data: image },
         });
       }
       content.push({ type: "text", text: buildPrompt(input) });

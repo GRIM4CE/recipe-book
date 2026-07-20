@@ -92,6 +92,10 @@ describe("POST /api/extract", () => {
       { image: "abc" }, // missing mediaType
       { image: "abc", mediaType: "image/png" },
       { image: 7, mediaType: "image/jpeg" },
+      { images: [], mediaType: "image/jpeg" }, // empty array
+      { images: ["ok", 7], mediaType: "image/jpeg" }, // non-string member
+      { images: ["ok"] }, // missing mediaType
+      { image: "a", images: ["b"], mediaType: "image/jpeg" }, // both given
       { url: 7 },
       { url: "not a url" },
       { url: "ftp://example.com/x" },
@@ -126,14 +130,24 @@ describe("POST /api/extract", () => {
     expect(calls[0].categoryNames).toEqual(["Breakfast"]);
   });
 
-  it("passes an image through", async () => {
+  it("passes a single image through as a one-element array", async () => {
     const { extractor, calls } = stubExtractor(one);
     const app = createApp({ db, extractor });
     const res = await request(app)
       .post("/api/extract")
       .send({ image: "aGVsbG8=", mediaType: "image/jpeg" });
     expect(res.status).toBe(200);
-    expect(calls[0].image).toBe("aGVsbG8=");
+    expect(calls[0].images).toEqual(["aGVsbG8="]);
+  });
+
+  it("passes multiple images through", async () => {
+    const { extractor, calls } = stubExtractor(one);
+    const app = createApp({ db, extractor });
+    const res = await request(app)
+      .post("/api/extract")
+      .send({ images: ["aGVsbG8=", "d29ybGQ="], mediaType: "image/jpeg" });
+    expect(res.status).toBe(200);
+    expect(calls[0].images).toEqual(["aGVsbG8=", "d29ybGQ="]);
   });
 
   it("passes a url through and resolves categories per recipe", async () => {

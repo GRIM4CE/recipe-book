@@ -127,11 +127,13 @@ function parseTagName(body: unknown): string | null {
 
 function parseExtractInput(
   body: unknown,
-): { text: string } | { image: string } | { url: string } | string {
+): { text: string } | { images: string[] } | { url: string } | string {
   if (typeof body !== "object" || body === null) return "body must be an object";
   const b = body as Record<string, unknown>;
-  const given = ["text", "image", "url"].filter((k) => b[k] !== undefined);
-  if (given.length !== 1) return "provide exactly one of text, image, or url";
+  const given = ["text", "image", "images", "url"].filter(
+    (k) => b[k] !== undefined,
+  );
+  if (given.length !== 1) return "provide exactly one of text, image(s), or url";
   if (b.text !== undefined) {
     if (typeof b.text !== "string" || !b.text.trim()) {
       return "text must be a non-empty string";
@@ -151,11 +153,17 @@ function parseExtractInput(
     }
     return { url: parsed.href };
   }
-  if (typeof b.image !== "string" || !b.image) {
-    return "image must be a base64 string";
+  // Accept a single `image` (legacy clients) or an `images` array; normalize to
+  // an array so the extractor reads all photos as one source.
+  const images = b.images !== undefined ? b.images : [b.image];
+  if (!Array.isArray(images) || images.length === 0) {
+    return "images must be a non-empty array of base64 strings";
+  }
+  if (images.some((img) => typeof img !== "string" || !img)) {
+    return "each image must be a base64 string";
   }
   if (b.mediaType !== "image/jpeg") return "mediaType must be image/jpeg";
-  return { image: b.image };
+  return { images: images as string[] };
 }
 
 // Builds the notes attribution block for an imported recipe: a "Source:" line
