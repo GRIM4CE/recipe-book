@@ -76,4 +76,19 @@ describe('filterRecipes', () => {
     ]);
     expect(filterRecipes(recipes, { tag: 'Pasta', query: 'gin' })).toEqual([]);
   });
+
+  it('filters by ingredient, matching within freeform lines', () => {
+    expect(filterRecipes(recipes, { ingredient: 'campari' })).toEqual([recipes[1]]);
+    expect(filterRecipes(recipes, { ingredient: 'beef' })).toEqual([recipes[0]]);
+    // Case-insensitive and tolerant of recipes with no ingredients.
+    expect(filterRecipes(recipes, { ingredient: 'GIN' })).toEqual([recipes[1]]);
+    expect(filterRecipes(recipes, { ingredient: 'saffron' })).toEqual([]);
+  });
+
+  it('combines ingredient with other filters', () => {
+    expect(filterRecipes(recipes, { ingredient: 'tomatoes', categoryId: 1 })).toEqual([
+      recipes[0],
+    ]);
+    expect(filterRecipes(recipes, { ingredient: 'gin', tag: 'Pasta' })).toEqual([]);
+  });
 });
