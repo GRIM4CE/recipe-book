@@ -142,7 +142,7 @@ export default function App() {
   } else if (detailMatch) {
     const recipe = findRecipe(detailMatch[1]);
     page = recipe ? (
-      <RecipeDetail recipe={recipe} canEdit={Boolean(user)} />
+      <RecipeDetail recipe={recipe} recipes={recipes} canEdit={Boolean(user)} />
     ) : (
       <p className="notice">That recipe doesn’t exist (anymore).</p>
     );

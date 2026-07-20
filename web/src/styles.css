@@ -332,6 +332,23 @@ body {
   white-space: pre-wrap;
 }
 
+.instructions a,
+.notes a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--ink-soft);
+  text-underline-offset: 2px;
+}
+
+.instructions a:hover,
+.notes a:hover {
+  text-decoration-color: currentColor;
+}
+
+.recipe-link {
+  font-weight: 600;
+}
+
 .detail-meta {
   color: var(--ink-soft);
   font-size: 0.85rem;
