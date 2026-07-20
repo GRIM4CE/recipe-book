@@ -162,7 +162,7 @@ export function createDb(client: Client) {
     },
 
     async listRecipes(): Promise<Recipe[]> {
-      const rs = await client.execute(`${RECIPE_SELECT} ORDER BY r.created_at DESC`);
+      const rs = await client.execute(`${RECIPE_SELECT} ORDER BY r.title COLLATE NOCASE`);
       const tags = await tagsByRecipe();
       return rs.rows.map((row) => rowToRecipe(row, tags.get(Number(row.id)) ?? []));
     },
