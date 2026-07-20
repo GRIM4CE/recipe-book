@@ -16,6 +16,8 @@ export interface ExtractedRecipe {
   found: boolean;
   title: string;
   summary: string;
+  // Servings/yield as written (e.g. "4" or "Makes 12"), "" if not stated.
+  servings: string;
   ingredients: string[];
   instructions: string[];
   // A category name from categoryNames, or null.
@@ -37,6 +39,11 @@ const RECIPE_SCHEMA = {
     },
     title: { type: "string" },
     summary: { type: "string", description: "one short line about the dish" },
+    servings: {
+      type: "string",
+      description:
+        'servings or yield as written (e.g. "4" or "Makes 12"), empty if not stated',
+    },
     ingredients: { type: "array", items: { type: "string" } },
     instructions: { type: "array", items: { type: "string" } },
     category: {
@@ -48,6 +55,7 @@ const RECIPE_SCHEMA = {
     "found",
     "title",
     "summary",
+    "servings",
     "ingredients",
     "instructions",
     "category",
@@ -66,6 +74,7 @@ function buildPrompt(input: ExtractInput): string {
     "- ingredients: one entry per ingredient, quantities as written.",
     "- instructions: one entry per step, without step numbers.",
     "- summary: one short line describing the dish.",
+    '- servings: how many the recipe serves or yields, as written (e.g. "4" or "Makes 12"); empty if not stated.',
     `- category: the best fit among [${input.categoryNames.join(", ")}], or null if none fits.`,
     "- If the input does not contain a recipe, set found to false and leave every other field empty.",
     ...(input.text ? ["", input.text] : []),

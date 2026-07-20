@@ -42,6 +42,7 @@ const recipes: Array<{
 }> = [
   {
     title: "Buttermilk Pancakes",
+    servings: "4",
     summary: "Tall, fluffy weekend pancakes with crispy edges.",
     category: "Breakfast",
     ingredients: [
@@ -63,6 +64,7 @@ const recipes: Array<{
   },
   {
     title: "Sunday Bolognese",
+    servings: "6",
     summary: "Slow-simmered ragù for a lazy afternoon.",
     category: "Dinner",
     tags: ["Pasta", "Slow Cooked"],
@@ -88,6 +90,7 @@ const recipes: Array<{
   },
   {
     title: "Weeknight Chicken Tikka",
+    servings: "4",
     summary: "Yogurt-marinated chicken under the broiler, sauce in one pan.",
     category: "Dinner",
     ingredients: [
@@ -109,6 +112,7 @@ const recipes: Array<{
   },
   {
     title: "Brown Butter Chocolate Chip Cookies",
+    servings: "Makes 24 cookies",
     summary: "Nutty, chewy, slightly oversized. The house cookie.",
     category: "Dessert",
     ingredients: [
@@ -131,6 +135,7 @@ const recipes: Array<{
   },
   {
     title: "Overnight Oats",
+    servings: "1",
     summary: "Assemble tonight, breakfast appears tomorrow.",
     category: "Breakfast",
     ingredients: [
@@ -149,6 +154,7 @@ const recipes: Array<{
   },
   {
     title: "Classic Negroni",
+    servings: "1",
     summary: "Equal parts, no debate. Stirred, never shaken.",
     category: "Drinks",
     ingredients: [
@@ -165,6 +171,7 @@ const recipes: Array<{
   },
   {
     title: "Whiskey Sour",
+    servings: "1",
     summary: "Fresh lemon or nothing. Egg white optional but encouraged.",
     category: "Drinks",
     ingredients: [
@@ -182,6 +189,7 @@ const recipes: Array<{
   },
   {
     title: "Garlic Smashed Potatoes",
+    servings: "4",
     summary: "Boiled, smashed, and roasted until shatteringly crisp.",
     category: "Sides",
     tags: ["Grill Out"],
@@ -206,6 +214,7 @@ for (const r of recipes) {
     {
       title: r.title,
       summary: r.summary,
+      servings: r.servings,
       ingredients: r.ingredients,
       instructions: r.instructions,
       categoryId: categories.get(r.category),

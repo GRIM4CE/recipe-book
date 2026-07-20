@@ -23,6 +23,7 @@ function rowToRecipe(row: Row, tags: string[]): Recipe {
     id: Number(row.id),
     title: String(row.title),
     summary: String(row.summary),
+    servings: row.servings == null ? "" : String(row.servings),
     ingredients: JSON.parse(String(row.ingredients)),
     instructions: JSON.parse(String(row.instructions)),
     category:
@@ -93,6 +94,16 @@ export function createDb(client: Client) {
   return {
     async applySchema(): Promise<void> {
       await client.executeMultiple(SCHEMA);
+      // CREATE TABLE IF NOT EXISTS won't add columns to databases created
+      // before servings existed, so patch those in place.
+      const cols = await client.execute(
+        "SELECT name FROM pragma_table_info('recipes')",
+      );
+      if (!cols.rows.some((r) => r.name === "servings")) {
+        await client.execute(
+          "ALTER TABLE recipes ADD COLUMN servings TEXT NOT NULL DEFAULT ''",
+        );
+      }
     },
 
     async listCategories(): Promise<Category[]> {
@@ -177,12 +188,13 @@ export function createDb(client: Client) {
       const now = new Date().toISOString();
       const rs = await client.execute({
         sql: `INSERT INTO recipes
-          (title, summary, ingredients, instructions, category_id, photo_key,
-           created_by, source, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (title, summary, servings, ingredients, instructions, category_id,
+           photo_key, created_by, source, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           input.title,
           input.summary ?? "",
+          input.servings ?? "",
           JSON.stringify(input.ingredients ?? []),
           JSON.stringify(input.instructions ?? []),
           input.categoryId ?? null,
@@ -200,12 +212,13 @@ export function createDb(client: Client) {
 
     async updateRecipe(id: number, input: RecipeInput): Promise<Recipe | null> {
       const rs = await client.execute({
-        sql: `UPDATE recipes SET title = ?, summary = ?, ingredients = ?,
-          instructions = ?, category_id = ?, photo_key = ?, updated_at = ?
-          WHERE id = ?`,
+        sql: `UPDATE recipes SET title = ?, summary = ?, servings = ?,
+          ingredients = ?, instructions = ?, category_id = ?, photo_key = ?,
+          updated_at = ? WHERE id = ?`,
         args: [
           input.title,
           input.summary ?? "",
+          input.servings ?? "",
           JSON.stringify(input.ingredients ?? []),
           JSON.stringify(input.instructions ?? []),
           input.categoryId ?? null,

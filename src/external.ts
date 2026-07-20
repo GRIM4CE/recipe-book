@@ -54,6 +54,7 @@ export function createExternalRouter(opts: {
       {
         title: b.title.trim(),
         summary: typeof b.summary === "string" ? b.summary.trim() : "",
+        servings: typeof b.servings === "string" ? b.servings.trim() : "",
         ingredients: ((b.ingredients as string[] | undefined) ?? []).filter((s) =>
           s.trim(),
         ),

@@ -11,6 +11,7 @@ export interface Recipe {
   id: number;
   title: string;
   summary: string;
+  servings: string;
   ingredients: string[];
   instructions: string[];
   category: Category | null;
@@ -25,6 +26,7 @@ export interface Recipe {
 export interface RecipeInput {
   title: string;
   summary?: string;
+  servings?: string;
   ingredients?: string[];
   instructions?: string[];
   categoryId?: number | null;

@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS recipes (
   id INTEGER PRIMARY KEY,
   title TEXT NOT NULL,
   summary TEXT NOT NULL DEFAULT '',
+  servings TEXT NOT NULL DEFAULT '',
   ingredients TEXT NOT NULL DEFAULT '[]',
   instructions TEXT NOT NULL DEFAULT '[]',
   category_id INTEGER REFERENCES categories(id),

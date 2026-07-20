@@ -11,6 +11,7 @@ const lines = (text) =>
 export default function RecipeForm({ recipe, categories, tagSuggestions = [], onSaved }) {
   const [title, setTitle] = useState(recipe?.title ?? '');
   const [summary, setSummary] = useState(recipe?.summary ?? '');
+  const [servings, setServings] = useState(recipe?.servings ?? '');
   const [categoryId, setCategoryId] = useState(recipe?.category?.id ?? '');
   const [tags, setTags] = useState(recipe?.tags ?? []);
   const [tagInput, setTagInput] = useState('');
@@ -57,6 +58,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
       const extracted = await api.extractRecipe(payload);
       setTitle(extracted.title);
       setSummary(extracted.summary);
+      setServings(extracted.servings ?? '');
       setCategoryId(extracted.categoryId ?? '');
       setIngredients(extracted.ingredients.join('\n'));
       setInstructions(extracted.instructions.join('\n'));
@@ -119,6 +121,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
       const data = {
         title,
         summary,
+        servings: servings.trim(),
         categoryId: categoryId === '' ? null : Number(categoryId),
         tags: savedTags,
         ingredients: lines(ingredients),
@@ -189,6 +192,14 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
           placeholder="One line about this recipe"
+        />
+      </label>
+      <label>
+        Servings
+        <input
+          value={servings}
+          onChange={(e) => setServings(e.target.value)}
+          placeholder="e.g. 4"
         />
       </label>
       <label>
