@@ -5,7 +5,7 @@ import express, { type ErrorRequestHandler, type RequestHandler } from "express"
 import { requireUser, type TokenVerifier } from "./auth.js";
 import { createExternalRouter } from "./external.js";
 import type { Db } from "./db.js";
-import type { ExtractedRecipe, Extractor } from "./extract.js";
+import type { ExtractionResult, Extractor } from "./extract.js";
 import type { Recipe, RecipeInput } from "./types.js";
 import type { Presigner } from "./uploads.js";
 
@@ -116,17 +116,29 @@ function parseCategoryInput(
 
 function parseExtractInput(
   body: unknown,
-): { text: string } | { image: string } | string {
+): { text: string } | { image: string } | { url: string } | string {
   if (typeof body !== "object" || body === null) return "body must be an object";
   const b = body as Record<string, unknown>;
-  if ((b.text === undefined) === (b.image === undefined)) {
-    return "provide exactly one of text or image";
-  }
+  const given = ["text", "image", "url"].filter((k) => b[k] !== undefined);
+  if (given.length !== 1) return "provide exactly one of text, image, or url";
   if (b.text !== undefined) {
     if (typeof b.text !== "string" || !b.text.trim()) {
       return "text must be a non-empty string";
     }
     return { text: b.text };
+  }
+  if (b.url !== undefined) {
+    if (typeof b.url !== "string") return "url must be a string";
+    let parsed: URL;
+    try {
+      parsed = new URL(b.url);
+    } catch {
+      return "url must be an absolute http(s) URL";
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return "url must be an absolute http(s) URL";
+    }
+    return { url: parsed.href };
   }
   if (typeof b.image !== "string" || !b.image) {
     return "image must be a base64 string";
@@ -162,7 +174,7 @@ export function createApp(opts: AppOptions) {
         return;
       }
       const categories = await db.listCategories();
-      let result: ExtractedRecipe;
+      let result: ExtractionResult;
       try {
         result = await opts.extractor.extract({
           ...input,
@@ -173,21 +185,31 @@ export function createApp(opts: AppOptions) {
         res.status(502).json({ error: "extraction failed" });
         return;
       }
-      if (!result.found) {
+      if (result.pageUnreadable) {
+        res.status(422).json({
+          error: "couldn't read that page — copy the recipe text instead",
+        });
+        return;
+      }
+      if (result.recipes.length === 0) {
         res.status(422).json({ error: "no recipe found in that input" });
         return;
       }
-      const category = result.category
-        ? await db.getCategoryByName(result.category)
-        : null;
-      res.json({
-        title: result.title,
-        summary: result.summary,
-        servings: result.servings,
-        ingredients: result.ingredients,
-        instructions: result.instructions,
-        categoryId: category?.id ?? null,
-      });
+      const recipes = [];
+      for (const r of result.recipes) {
+        const category = r.category
+          ? await db.getCategoryByName(r.category)
+          : null;
+        recipes.push({
+          title: r.title,
+          summary: r.summary,
+          servings: r.servings,
+          ingredients: r.ingredients,
+          instructions: r.instructions,
+          categoryId: category?.id ?? null,
+        });
+      }
+      res.json({ recipes });
     },
   );
 

@@ -65,12 +65,17 @@ describe("JSON bodies through serverless-http", () => {
       async extract(input) {
         calls.push(input);
         return {
-          found: true,
-          title: "Pancakes",
-          summary: "Fluffy",
-          ingredients: ["2 cups flour"],
-          instructions: ["Mix."],
-          category: null,
+          pageUnreadable: false,
+          recipes: [
+            {
+              title: "Pancakes",
+              summary: "Fluffy",
+              servings: "",
+              ingredients: ["2 cups flour"],
+              instructions: ["Mix."],
+              category: null,
+            },
+          ],
         };
       },
     };

@@ -32,6 +32,9 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
   const [showImport, setShowImport] = useState(!recipe);
   const [importText, setImportText] = useState('');
   const [importing, setImporting] = useState(false);
+  const [importUrl, setImportUrl] = useState('');
+  // Non-null after an extraction that found several recipes: the picker list.
+  const [foundRecipes, setFoundRecipes] = useState(null);
 
   async function pickPhoto(e) {
     const file = e.target.files?.[0];
@@ -51,19 +54,26 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
     setPhotoPreview(null);
   }
 
+  function applyRecipe(r) {
+    setTitle(r.title);
+    setSummary(r.summary);
+    setServings(r.servings ?? '');
+    setCategoryId(r.categoryId ?? '');
+    setIngredients(r.ingredients.join('\n'));
+    setInstructions(r.instructions.join('\n'));
+    setImportText('');
+    setImportUrl('');
+    setFoundRecipes(null);
+    setShowImport(false);
+  }
+
   async function runImport(payload) {
     setImporting(true);
     setError(null);
     try {
-      const extracted = await api.extractRecipe(payload);
-      setTitle(extracted.title);
-      setSummary(extracted.summary);
-      setServings(extracted.servings ?? '');
-      setCategoryId(extracted.categoryId ?? '');
-      setIngredients(extracted.ingredients.join('\n'));
-      setInstructions(extracted.instructions.join('\n'));
-      setImportText('');
-      setShowImport(false);
+      const { recipes } = await api.extractRecipe(payload);
+      if (recipes.length === 1) applyRecipe(recipes[0]);
+      else setFoundRecipes(recipes);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -142,14 +152,56 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
     <form className="form" onSubmit={submit}>
       <h2>{recipe ? 'Edit recipe' : 'New recipe'}</h2>
       {!recipe &&
-        (showImport ? (
+        (foundRecipes ? (
           <div className="import-panel">
-            <span className="field-title">Import from text or photo</span>
+            <span className="field-title">
+              Found {foundRecipes.length} recipes — pick one
+            </span>
+            {foundRecipes.map((r, i) => (
+              <button
+                key={i}
+                className="btn ghost small"
+                type="button"
+                onClick={() => applyRecipe(r)}
+              >
+                {r.title}
+              </button>
+            ))}
+            <div className="form-actions import-actions">
+              <button
+                className="btn ghost small"
+                type="button"
+                onClick={() => setFoundRecipes(null)}
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        ) : showImport ? (
+          <div className="import-panel">
+            <span className="field-title">Import from a URL, text, or photo</span>
+            <div className="import-url-row">
+              <input
+                type="url"
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                placeholder="Link to a recipe page or Claude chat"
+                disabled={importing}
+              />
+              <button
+                className="btn ghost small"
+                type="button"
+                onClick={() => runImport({ url: importUrl.trim() })}
+                disabled={importing || !importUrl.trim()}
+              >
+                {importing ? 'Reading…' : 'Extract from URL'}
+              </button>
+            </div>
             <textarea
               rows={4}
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
-              placeholder="Paste a recipe from anywhere…"
+              placeholder="…or paste recipe text here"
               disabled={importing}
             />
             <div className="form-actions import-actions">
@@ -179,7 +231,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
             type="button"
             onClick={() => setShowImport(true)}
           >
-            Import from text or photo
+            Import from a URL, text, or photo
           </button>
         ))}
       <label>
