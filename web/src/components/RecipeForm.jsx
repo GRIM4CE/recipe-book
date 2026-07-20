@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 import { blobToBase64, downscaleToJpeg } from '../image.js';
+import ConfirmDialog from './ConfirmDialog.jsx';
 const lines = (text) =>
   text
     .split('\n')
@@ -8,7 +9,7 @@ const lines = (text) =>
     .filter(Boolean);
 
 // One line per ingredient/step: far friendlier on a phone than dynamic rows.
-export default function RecipeForm({ recipe, categories, tagSuggestions = [], onSaved }) {
+export default function RecipeForm({ recipe, categories, tagSuggestions = [], onSaved, onDelete }) {
   const [title, setTitle] = useState(recipe?.title ?? '');
   const [summary, setSummary] = useState(recipe?.summary ?? '');
   const [servings, setServings] = useState(recipe?.servings ?? '');
@@ -27,6 +28,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
   const [photoPreview, setPhotoPreview] = useState(recipe?.photoUrl ?? null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Import panel: only offered when creating, collapses after a successful
   // extraction.
@@ -358,6 +360,15 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
       </label>
       {error && <p className="error">{error}</p>}
       <div className="form-actions">
+        {recipe && onDelete && (
+          <button
+            className="btn danger delete-action"
+            type="button"
+            onClick={() => setConfirmingDelete(true)}
+          >
+            Delete
+          </button>
+        )}
         <a className="btn ghost" href={recipe ? `#/recipes/${recipe.id}` : '#/'}>
           Cancel
         </a>
@@ -365,6 +376,17 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
           {busy ? 'Saving…' : 'Save recipe'}
         </button>
       </div>
+      <ConfirmDialog
+        open={confirmingDelete}
+        title={`Delete “${recipe?.title}”?`}
+        message="This can’t be undone."
+        confirmLabel="Delete"
+        onConfirm={() => {
+          setConfirmingDelete(false);
+          onDelete(recipe);
+        }}
+        onCancel={() => setConfirmingDelete(false)}
+      />
     </form>
   );
 }

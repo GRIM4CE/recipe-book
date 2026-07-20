@@ -62,8 +62,8 @@ export default function App() {
     window.location.hash = `#/recipes/${recipe.id}`;
   }
 
+  // Confirmation is handled by the edit form's modal before this runs.
   async function onDeleteRecipe(recipe) {
-    if (!window.confirm(`Delete “${recipe.title}”?`)) return;
     try {
       await api.deleteRecipe(recipe.id);
       reload();
@@ -116,6 +116,7 @@ export default function App() {
         categories={categories}
         tagSuggestions={tagSuggestions}
         onSaved={onSaved}
+        onDelete={onDeleteRecipe}
       />
     ) : (
       <p className="notice">That recipe doesn’t exist (anymore).</p>
@@ -141,7 +142,7 @@ export default function App() {
   } else if (detailMatch) {
     const recipe = findRecipe(detailMatch[1]);
     page = recipe ? (
-      <RecipeDetail recipe={recipe} canEdit={Boolean(user)} onDelete={onDeleteRecipe} />
+      <RecipeDetail recipe={recipe} canEdit={Boolean(user)} />
     ) : (
       <p className="notice">That recipe doesn’t exist (anymore).</p>
     );
