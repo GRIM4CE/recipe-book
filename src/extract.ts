@@ -23,6 +23,9 @@ export interface ExtractedRecipe {
   instructions: string[];
   // A category name from categoryNames, or null.
   category: string | null;
+  // Who the recipe is credited to, as written on the source (e.g. "by Jane
+  // Doe", "Adapted from NYT Cooking"), or null when no author is stated.
+  credit: string | null;
 }
 
 export interface ExtractionResult {
@@ -68,6 +71,11 @@ const RESULT_SCHEMA = {
             anyOf: [{ type: "string" }, { type: "null" }],
             description: "one of the provided category names, or null",
           },
+          credit: {
+            anyOf: [{ type: "string" }, { type: "null" }],
+            description:
+              "who the recipe is credited to, as written on the source (e.g. \"by Jane Doe\", \"Adapted from NYT Cooking\"); null when no author is stated",
+          },
         },
         required: [
           "title",
@@ -76,6 +84,7 @@ const RESULT_SCHEMA = {
           "ingredients",
           "instructions",
           "category",
+          "credit",
         ],
         additionalProperties: false,
       },
@@ -101,6 +110,7 @@ export function buildPrompt(input: ExtractInput): string {
     "- summary: one short line describing the dish.",
     '- servings: how many the recipe serves or yields, as written (e.g. "4" or "Makes 12"). If not stated, estimate a reasonable number from the ingredient quantities and typical portion sizes. For cocktails and other single-drink recipes, use "1" unless a different yield is stated. Never leave this empty.',
     `- category: per recipe, the best fit among [${input.categoryNames.join(", ")}], or null if none fits.`,
+    '- credit: who the recipe is credited to, as written on the source (e.g. "by Jane Doe", "Adapted from NYT Cooking"). Use null when no author or attribution is stated.',
     "- If the input contains no recipe, return an empty recipes array.",
     "- Set pageUnreadable to true only when a URL was provided and you could not retrieve its content; otherwise false.",
     ...(input.text ? ["", input.text] : []),

@@ -21,6 +21,7 @@ const pancakes = {
   ingredients: ["2 cups flour", "2 eggs"],
   instructions: ["Mix everything.", "Fry in butter."],
   category: "Breakfast",
+  credit: null,
 };
 
 const one: ExtractionResult = { pageUnreadable: false, recipes: [pancakes] };
@@ -115,6 +116,8 @@ describe("POST /api/extract", () => {
       ingredients: ["2 cups flour", "2 eggs"],
       instructions: ["Mix everything.", "Fry in butter."],
       categoryId: breakfastId,
+      // No URL and no credit in a plain text import → empty attribution.
+      notes: "",
     };
     // Response carries `recipes` and, for older cached web bundles, the first
     // recipe's fields spread at the top level.
@@ -138,7 +141,12 @@ describe("POST /api/extract", () => {
       pageUnreadable: false,
       recipes: [
         pancakes,
-        { ...pancakes, title: "Waffles", category: "Nonexistent" },
+        {
+          ...pancakes,
+          title: "Waffles",
+          category: "Nonexistent",
+          credit: "Chef Ann",
+        },
       ],
     });
     const app = createApp({ db, extractor });
@@ -151,6 +159,12 @@ describe("POST /api/extract", () => {
     expect(res.body.recipes[1].categoryId).toBeNull();
     expect(res.body.recipes[1].title).toBe("Waffles");
     expect(calls[0].url).toBe("https://claude.ai/share/abc");
+    // The source URL is kept for every recipe; the credit is added when the
+    // page named an author.
+    expect(res.body.recipes[0].notes).toBe("Source: https://claude.ai/share/abc");
+    expect(res.body.recipes[1].notes).toBe(
+      "Source: https://claude.ai/share/abc\nCredit: Chef Ann",
+    );
   });
 
   it("422s with copy-paste guidance when the page was unreadable", async () => {
@@ -203,5 +217,9 @@ describe("buildPrompt servings guidance", () => {
 
   it("never leaves servings empty", () => {
     expect(prompt).toContain("Never leave this empty.");
+  });
+
+  it("asks for the recipe's author credit", () => {
+    expect(prompt).toMatch(/credit: who the recipe is credited to/);
   });
 });

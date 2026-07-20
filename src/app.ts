@@ -158,6 +158,19 @@ function parseExtractInput(
   return { image: b.image };
 }
 
+// Builds the notes attribution block for an imported recipe: a "Source:" line
+// for URL imports and a "Credit:" line when the source names an author. Returns
+// "" when there is nothing to attribute.
+function attributionNotes(
+  sourceUrl: string | undefined,
+  credit: string | null,
+): string {
+  const lines: string[] = [];
+  if (sourceUrl) lines.push(`Source: ${sourceUrl}`);
+  if (credit?.trim()) lines.push(`Credit: ${credit.trim()}`);
+  return lines.join("\n");
+}
+
 export function createApp(opts: AppOptions) {
   const { db } = opts;
   const app = express();
@@ -206,6 +219,10 @@ export function createApp(opts: AppOptions) {
         res.status(422).json({ error: "no recipe found in that input" });
         return;
       }
+      // Preserve provenance the form would otherwise drop: the source URL (when
+      // the import came from one) and the recipe's author credit. They land in
+      // notes as an attribution block the user can edit before saving.
+      const sourceUrl = "url" in input ? input.url : undefined;
       const recipes = [];
       for (const r of result.recipes) {
         const category = r.category
@@ -218,6 +235,7 @@ export function createApp(opts: AppOptions) {
           ingredients: r.ingredients,
           instructions: r.instructions,
           categoryId: category?.id ?? null,
+          notes: attributionNotes(sourceUrl, r.credit),
         });
       }
       // Backward-compat: web bundles predating the multi-recipe picker read the
