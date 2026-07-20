@@ -21,6 +21,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
   const [instructions, setInstructions] = useState(
     recipe?.instructions.join('\n') ?? '',
   );
+  const [notes, setNotes] = useState(recipe?.notes ?? '');
   // photo: unchanged (undefined) | removed (null) | new blob
   const [photoBlob, setPhotoBlob] = useState(undefined);
   const [photoPreview, setPhotoPreview] = useState(recipe?.photoUrl ?? null);
@@ -61,6 +62,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
     setCategoryId(r.categoryId ?? '');
     setIngredients(r.ingredients.join('\n'));
     setInstructions(r.instructions.join('\n'));
+    setNotes(r.notes ?? '');
     setImportText('');
     setImportUrl('');
     setFoundRecipes(null);
@@ -136,6 +138,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
         tags: savedTags,
         ingredients: lines(ingredients),
         instructions: lines(instructions),
+        notes: notes.trim(),
         photoKey,
       };
       const saved = recipe
@@ -331,6 +334,15 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
           value={instructions}
           onChange={(e) => setInstructions(e.target.value)}
           placeholder={'Mix everything.\nBake at 375°F.'}
+        />
+      </label>
+      <label>
+        Notes <span className="hint-inline">tips, substitutions, anything</span>
+        <textarea
+          rows={4}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="e.g. Doubles well. Swap butter for oil to make it dairy-free."
         />
       </label>
       {error && <p className="error">{error}</p>}

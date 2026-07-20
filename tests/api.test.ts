@@ -38,11 +38,13 @@ describe("recipes", () => {
       title: "Pancakes",
       summary: "Fluffy.",
       servings: "4",
+      notes: "Best with real maple syrup.",
       ingredients: ["flour", "eggs"],
       instructions: ["mix", "fry"],
     });
     expect(created.status).toBe(201);
     expect(created.body.servings).toBe("4");
+    expect(created.body.notes).toBe("Best with real maple syrup.");
     expect(created.body.createdBy).toBe("dev");
     expect(created.body.source).toBe("web");
     expect(created.body.photoUrl).toBeNull();
@@ -98,6 +100,13 @@ describe("recipes", () => {
       (
         await request(app)
           .post("/api/recipes")
+          .send({ title: "X", notes: 5 })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(app)
+          .post("/api/recipes")
           .send({ title: "X", categoryId: 999 })
       ).status,
     ).toBe(400);
@@ -111,10 +120,16 @@ describe("recipes", () => {
 
     const updated = await request(app)
       .put(`/api/recipes/${id}`)
-      .send({ title: "French Toast", servings: "2", ingredients: ["bread", "eggs"] });
+      .send({
+        title: "French Toast",
+        servings: "2",
+        notes: "Use day-old bread.",
+        ingredients: ["bread", "eggs"],
+      });
     expect(updated.status).toBe(200);
     expect(updated.body.title).toBe("French Toast");
     expect(updated.body.servings).toBe("2");
+    expect(updated.body.notes).toBe("Use day-old bread.");
 
     expect((await request(app).delete(`/api/recipes/${id}`)).status).toBe(204);
     expect((await request(app).get(`/api/recipes/${id}`)).status).toBe(404);
@@ -126,7 +141,7 @@ describe("recipes", () => {
 });
 
 describe("schema migration", () => {
-  it("adds the servings column to a database created before it existed", async () => {
+  it("adds the servings and notes columns to a database created before they existed", async () => {
     const old = createClient({ url: `file:${join(dir, "old.db")}` });
     await old.execute(`CREATE TABLE recipes (
       id INTEGER PRIMARY KEY,
@@ -144,10 +159,11 @@ describe("schema migration", () => {
     const oldDb = createDb(old);
     await oldDb.applySchema();
     const recipe = await oldDb.createRecipe(
-      { title: "Old", servings: "3" },
+      { title: "Old", servings: "3", notes: "Grandma's version." },
       { createdBy: "dev", source: "web" },
     );
     expect(recipe.servings).toBe("3");
+    expect(recipe.notes).toBe("Grandma's version.");
     old.close();
   });
 });

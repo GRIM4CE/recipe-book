@@ -14,6 +14,7 @@ export interface Recipe {
   servings: string;
   ingredients: string[];
   instructions: string[];
+  notes: string;
   category: Category | null;
   tags: string[];
   photoKey: string | null;
@@ -29,6 +30,7 @@ export interface RecipeInput {
   servings?: string;
   ingredients?: string[];
   instructions?: string[];
+  notes?: string;
   categoryId?: number | null;
   tags?: string[];
   photoKey?: string | null;

@@ -84,6 +84,13 @@ export default function RecipeDetail({ recipe, canEdit, onDelete }) {
         </section>
       )}
 
+      {recipe.notes && (
+        <section className="detail-section">
+          <h3>Notes</h3>
+          <p className="notes">{recipe.notes}</p>
+        </section>
+      )}
+
       {canEdit && (
         <div className="detail-actions">
           <a className="btn ghost" href={`#/recipes/${recipe.id}/edit`}>Edit</a>
