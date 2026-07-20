@@ -7,10 +7,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import type { TokenVerifier } from "../src/auth.js";
 import { createDb, type Db } from "../src/db.js";
-import type { ExtractInput, ExtractedRecipe, Extractor } from "../src/extract.js";
+import type {
+  ExtractInput,
+  ExtractionResult,
+  Extractor,
+} from "../src/extract.js";
 
-const found: ExtractedRecipe = {
-  found: true,
+const pancakes = {
   title: "Pancakes",
   summary: "Fluffy weekend pancakes",
   ingredients: ["2 cups flour", "2 eggs"],
@@ -18,8 +21,10 @@ const found: ExtractedRecipe = {
   category: "Breakfast",
 };
 
+const one: ExtractionResult = { pageUnreadable: false, recipes: [pancakes] };
+
 // Records the inputs it was given and returns a canned result (or throws).
-function stubExtractor(result: ExtractedRecipe | Error) {
+function stubExtractor(result: ExtractionResult | Error) {
   const calls: ExtractInput[] = [];
   const extractor: Extractor = {
     async extract(input) {
@@ -67,22 +72,26 @@ describe("POST /api/extract", () => {
     const app = createApp({
       db,
       verifier,
-      extractor: stubExtractor(found).extractor,
+      extractor: stubExtractor(one).extractor,
     });
     const res = await request(app).post("/api/extract").send({ text: "hi" });
     expect(res.status).toBe(401);
   });
 
   it("400s malformed payloads", async () => {
-    const app = createApp({ db, extractor: stubExtractor(found).extractor });
+    const app = createApp({ db, extractor: stubExtractor(one).extractor });
     const cases = [
       {},
       { text: "" },
       { text: 7 },
       { text: "x", image: "y" },
+      { text: "x", url: "https://ok.example" },
       { image: "abc" }, // missing mediaType
       { image: "abc", mediaType: "image/png" },
       { image: 7, mediaType: "image/jpeg" },
+      { url: 7 },
+      { url: "not a url" },
+      { url: "ftp://example.com/x" },
     ];
     for (const body of cases) {
       const res = await request(app).post("/api/extract").send(body);
@@ -91,51 +100,82 @@ describe("POST /api/extract", () => {
   });
 
   it("extracts from text and resolves the category by name", async () => {
-    const { extractor, calls } = stubExtractor(found);
+    const { extractor, calls } = stubExtractor(one);
     const app = createApp({ db, extractor });
     const res = await request(app)
       .post("/api/extract")
       .send({ text: "pancake recipe blob" });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
-      title: "Pancakes",
-      summary: "Fluffy weekend pancakes",
-      ingredients: ["2 cups flour", "2 eggs"],
-      instructions: ["Mix everything.", "Fry in butter."],
-      categoryId: breakfastId,
+      recipes: [
+        {
+          title: "Pancakes",
+          summary: "Fluffy weekend pancakes",
+          ingredients: ["2 cups flour", "2 eggs"],
+          instructions: ["Mix everything.", "Fry in butter."],
+          categoryId: breakfastId,
+        },
+      ],
     });
     expect(calls[0].text).toBe("pancake recipe blob");
     expect(calls[0].categoryNames).toEqual(["Breakfast"]);
   });
 
-  it("extracts from an image and nulls unknown categories", async () => {
-    const { extractor, calls } = stubExtractor({
-      ...found,
-      category: "Nonexistent",
-    });
+  it("passes an image through", async () => {
+    const { extractor, calls } = stubExtractor(one);
     const app = createApp({ db, extractor });
     const res = await request(app)
       .post("/api/extract")
       .send({ image: "aGVsbG8=", mediaType: "image/jpeg" });
     expect(res.status).toBe(200);
-    expect(res.body.categoryId).toBeNull();
     expect(calls[0].image).toBe("aGVsbG8=");
   });
 
-  it("422s when the input has no recipe", async () => {
-    const none: ExtractedRecipe = {
-      found: false,
-      title: "",
-      summary: "",
-      ingredients: [],
-      instructions: [],
-      category: null,
-    };
-    const app = createApp({ db, extractor: stubExtractor(none).extractor });
+  it("passes a url through and resolves categories per recipe", async () => {
+    const { extractor, calls } = stubExtractor({
+      pageUnreadable: false,
+      recipes: [
+        pancakes,
+        { ...pancakes, title: "Waffles", category: "Nonexistent" },
+      ],
+    });
+    const app = createApp({ db, extractor });
+    const res = await request(app)
+      .post("/api/extract")
+      .send({ url: "https://claude.ai/share/abc" });
+    expect(res.status).toBe(200);
+    expect(res.body.recipes).toHaveLength(2);
+    expect(res.body.recipes[0].categoryId).toBe(breakfastId);
+    expect(res.body.recipes[1].categoryId).toBeNull();
+    expect(res.body.recipes[1].title).toBe("Waffles");
+    expect(calls[0].url).toBe("https://claude.ai/share/abc");
+  });
+
+  it("422s with copy-paste guidance when the page was unreadable", async () => {
+    const app = createApp({
+      db,
+      extractor: stubExtractor({ pageUnreadable: true, recipes: [] }).extractor,
+    });
+    const res = await request(app)
+      .post("/api/extract")
+      .send({ url: "https://claude.ai/share/abc" });
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe(
+      "couldn't read that page — copy the recipe text instead",
+    );
+  });
+
+  it("422s when nothing was found", async () => {
+    const app = createApp({
+      db,
+      extractor: stubExtractor({ pageUnreadable: false, recipes: [] })
+        .extractor,
+    });
     const res = await request(app)
       .post("/api/extract")
       .send({ text: "a cat photo caption" });
     expect(res.status).toBe(422);
+    expect(res.body.error).toBe("no recipe found in that input");
   });
 
   it("502s when extraction fails", async () => {

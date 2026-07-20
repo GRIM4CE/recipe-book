@@ -7,13 +7,13 @@ export interface ExtractInput {
   text?: string;
   // Base64 JPEG bytes (no data: prefix).
   image?: string;
+  // Absolute http(s) URL to fetch and extract from.
+  url?: string;
   // Existing category names so the model picks one of ours or none.
   categoryNames: string[];
 }
 
 export interface ExtractedRecipe {
-  // false when the input did not contain a recipe.
-  found: boolean;
   title: string;
   summary: string;
   ingredients: string[];
@@ -22,8 +22,15 @@ export interface ExtractedRecipe {
   category: string | null;
 }
 
+export interface ExtractionResult {
+  // True only when a url was given and its content could not be retrieved.
+  pageUnreadable: boolean;
+  // Every distinct recipe found; empty when the input had none.
+  recipes: ExtractedRecipe[];
+}
+
 export interface Extractor {
-  extract(input: ExtractInput): Promise<ExtractedRecipe>;
+  extract(input: ExtractInput): Promise<ExtractionResult>;
 }
 
 // Strict response schema; found:false is the model's clean way of saying
@@ -31,10 +38,6 @@ export interface Extractor {
 const RECIPE_SCHEMA = {
   type: "object",
   properties: {
-    found: {
-      type: "boolean",
-      description: "false when the input does not contain a recipe",
-    },
     title: { type: "string" },
     summary: { type: "string", description: "one short line about the dish" },
     ingredients: { type: "array", items: { type: "string" } },
@@ -45,7 +48,6 @@ const RECIPE_SCHEMA = {
     },
   },
   required: [
-    "found",
     "title",
     "summary",
     "ingredients",
@@ -101,7 +103,7 @@ export function createClaudeExtractor(opts: { apiKey: string }): Extractor {
           `no text block in response (stop_reason: ${response.stop_reason})`,
         );
       }
-      return JSON.parse(text.text) as ExtractedRecipe;
+      return JSON.parse(text.text) as ExtractionResult;
     },
   };
 }
