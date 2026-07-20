@@ -126,7 +126,7 @@ function parseExtractInput(
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
       return "url must be an absolute http(s) URL";
     }
-    return { url: b.url };
+    return { url: parsed.href };
   }
   if (typeof b.image !== "string" || !b.image) {
     return "image must be a base64 string";
