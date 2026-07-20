@@ -197,6 +197,44 @@ describe("categories", () => {
   });
 });
 
+describe("tags", () => {
+  it("lists, renames, and deletes tags", async () => {
+    await request(app)
+      .post("/api/recipes")
+      .send({ title: "Tagged Dish", tags: ["Spicy", "Quick"] });
+
+    const list = await request(app).get("/api/tags");
+    expect(list.status).toBe(200);
+    const spicy = list.body.tags.find((t: { name: string }) => t.name === "Spicy");
+    expect(spicy.count).toBe(1);
+
+    const renamed = await request(app)
+      .put(`/api/tags/${spicy.id}`)
+      .send({ name: "Fiery" });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.tags.some((t: { name: string }) => t.name === "Fiery")).toBe(
+      true,
+    );
+
+    const quick = list.body.tags.find((t: { name: string }) => t.name === "Quick");
+    expect((await request(app).delete(`/api/tags/${quick.id}`)).status).toBe(204);
+    const after = await request(app).get("/api/tags");
+    expect(after.body.tags.some((t: { name: string }) => t.name === "Quick")).toBe(
+      false,
+    );
+  });
+
+  it("rejects a blank rename and 404s a missing tag", async () => {
+    expect((await request(app).put("/api/tags/1").send({ name: "  " })).status).toBe(
+      400,
+    );
+    expect(
+      (await request(app).put("/api/tags/99999").send({ name: "Ghost" })).status,
+    ).toBe(404);
+    expect((await request(app).delete("/api/tags/99999")).status).toBe(404);
+  });
+});
+
 describe("cors", () => {
   it("answers preflight for the dev origin", async () => {
     const res = await request(app)
