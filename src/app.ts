@@ -118,6 +118,13 @@ function parseCategoryInput(
   return { name: b.name.trim(), color: b.color };
 }
 
+function parseTagName(body: unknown): string | null {
+  if (typeof body !== "object" || body === null) return null;
+  const b = body as Record<string, unknown>;
+  if (typeof b.name !== "string" || !b.name.trim()) return null;
+  return b.name.trim();
+}
+
 function parseExtractInput(
   body: unknown,
 ): { text: string } | { image: string } | { url: string } | string {
@@ -374,6 +381,33 @@ export function createApp(opts: AppOptions) {
     }
     if (result === "missing") {
       res.status(404).json({ error: "category not found" });
+      return;
+    }
+    res.status(204).end();
+  });
+
+  app.get("/api/tags", async (_req, res) => {
+    res.json({ tags: await db.listTags() });
+  });
+
+  app.put("/api/tags/:id", writeAuth, async (req, res) => {
+    const name = parseTagName(req.body);
+    if (name === null) {
+      res.status(400).json({ error: "name is required" });
+      return;
+    }
+    const result = await db.renameTag(Number(req.params.id), name);
+    if (result === "missing") {
+      res.status(404).json({ error: "tag not found" });
+      return;
+    }
+    // A rename can merge two tags, so hand back the whole refreshed list.
+    res.json({ tags: await db.listTags() });
+  });
+
+  app.delete("/api/tags/:id", writeAuth, async (req, res) => {
+    if (!(await db.deleteTag(Number(req.params.id)))) {
+      res.status(404).json({ error: "tag not found" });
       return;
     }
     res.status(204).end();

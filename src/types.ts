@@ -5,6 +5,12 @@ export interface Category {
   createdAt: string;
 }
 
+export interface TagSummary {
+  id: number;
+  name: string;
+  count: number;
+}
+
 export type RecipeSource = "web" | "import";
 
 export interface Recipe {

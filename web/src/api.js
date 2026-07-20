@@ -37,6 +37,7 @@ export const api = {
   listRecipes: () => req('/api/recipes').then((b) => b.recipes),
   getRecipe: (id) => req(`/api/recipes/${id}`),
   listCategories: () => req('/api/categories').then((b) => b.categories),
+  listTags: () => req('/api/tags').then((b) => b.tags),
 
   createRecipe: (data) => authed('/api/recipes', { method: 'POST', body: json(data) }),
   updateRecipe: (id, data) =>
@@ -63,4 +64,8 @@ export const api = {
   updateCategory: (id, data) =>
     authed(`/api/categories/${id}`, { method: 'PUT', body: json(data) }),
   deleteCategory: (id) => authed(`/api/categories/${id}`, { method: 'DELETE' }),
+
+  renameTag: (id, name) =>
+    authed(`/api/tags/${id}`, { method: 'PUT', body: json({ name }) }),
+  deleteTag: (id) => authed(`/api/tags/${id}`, { method: 'DELETE' }),
 };

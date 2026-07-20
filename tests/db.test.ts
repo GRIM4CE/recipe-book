@@ -170,3 +170,61 @@ describe("tags", () => {
     );
   });
 });
+
+describe("tag management", () => {
+  it("lists tags with recipe counts", async () => {
+    await db.createRecipe(
+      { title: "Fresh One", tags: ["Weeknight", "Freezer"] },
+      { createdBy: "dev", source: "web" },
+    );
+    await db.createRecipe(
+      { title: "Fresh Two", tags: ["Weeknight"] },
+      { createdBy: "dev", source: "web" },
+    );
+    const tags = await db.listTags();
+    const weeknight = tags.find((t) => t.name === "Weeknight");
+    const freezer = tags.find((t) => t.name === "Freezer");
+    expect(weeknight?.count).toBe(2);
+    expect(freezer?.count).toBe(1);
+  });
+
+  it("renames a tag in place and reflects it on recipes", async () => {
+    const recipe = await db.createRecipe(
+      { title: "Renamable", tags: ["Quik"] },
+      { createdBy: "dev", source: "web" },
+    );
+    const tag = (await db.listTags()).find((t) => t.name === "Quik");
+    expect(await db.renameTag(tag!.id, "Quick")).toBe("renamed");
+    expect((await db.getRecipe(recipe.id))?.tags).toContain("Quick");
+    expect((await db.listTags()).some((t) => t.name === "Quik")).toBe(false);
+  });
+
+  it("merges into an existing tag when renamed onto its name", async () => {
+    const recipe = await db.createRecipe(
+      { title: "Merger", tags: ["Grill", "BBQ"] },
+      { createdBy: "dev", source: "web" },
+    );
+    const bbq = (await db.listTags()).find((t) => t.name === "BBQ");
+    // "BBQ" folds into "Grill" (case-insensitive match on the target name).
+    expect(await db.renameTag(bbq!.id, "grill")).toBe("merged");
+    const tags = await db.listTags();
+    expect(tags.some((t) => t.name === "BBQ")).toBe(false);
+    // The recipe keeps a single "Grill" link, not a duplicate.
+    expect((await db.getRecipe(recipe.id))?.tags).toEqual(["Grill"]);
+  });
+
+  it("deletes a tag and strips it from recipes", async () => {
+    const recipe = await db.createRecipe(
+      { title: "Taggy", tags: ["Doomed Tag"] },
+      { createdBy: "dev", source: "web" },
+    );
+    const tag = (await db.listTags()).find((t) => t.name === "Doomed Tag");
+    expect(await db.deleteTag(tag!.id)).toBe(true);
+    expect((await db.getRecipe(recipe.id))?.tags).toEqual([]);
+    expect(await db.deleteTag(tag!.id)).toBe(false);
+  });
+
+  it("reports a missing tag on rename", async () => {
+    expect(await db.renameTag(99_999, "Ghost")).toBe("missing");
+  });
+});

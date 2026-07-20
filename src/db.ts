@@ -1,6 +1,12 @@
 import type { Client, Row } from "@libsql/client";
 import { SCHEMA } from "./db/schema.js";
-import type { Category, Recipe, RecipeInput, RecipeSource } from "./types.js";
+import type {
+  Category,
+  Recipe,
+  RecipeInput,
+  RecipeSource,
+  TagSummary,
+} from "./types.js";
 
 export interface RecipeMeta {
   createdBy: string;
@@ -8,6 +14,10 @@ export interface RecipeMeta {
 }
 
 export type CategoryDeleteResult = "deleted" | "in_use" | "missing";
+
+// A rename that lands on a name another tag already owns folds the two
+// together instead of failing on the UNIQUE constraint.
+export type TagRenameResult = "renamed" | "merged" | "missing";
 
 function rowToCategory(row: Row): Category {
   return {
@@ -247,6 +257,64 @@ export function createDb(client: Client) {
       });
       const rs = await client.execute({
         sql: "DELETE FROM recipes WHERE id = ?",
+        args: [id],
+      });
+      return rs.rowsAffected > 0;
+    },
+
+    async listTags(): Promise<TagSummary[]> {
+      const rs = await client.execute(
+        `SELECT t.id, t.name, COUNT(rt.recipe_id) AS count
+         FROM tags t LEFT JOIN recipe_tags rt ON rt.tag_id = t.id
+         GROUP BY t.id ORDER BY t.name COLLATE NOCASE`,
+      );
+      return rs.rows.map((row) => ({
+        id: Number(row.id),
+        name: String(row.name),
+        count: Number(row.count),
+      }));
+    },
+
+    async renameTag(id: number, name: string): Promise<TagRenameResult> {
+      const existing = await client.execute({
+        sql: "SELECT id FROM tags WHERE id = ?",
+        args: [id],
+      });
+      if (!existing.rows[0]) return "missing";
+      // A tag already owning this name (case-insensitively) is the survivor;
+      // fold this one's recipe links into it rather than duplicate the label.
+      const clash = await client.execute({
+        sql: "SELECT id FROM tags WHERE name = ? COLLATE NOCASE AND id <> ?",
+        args: [name, id],
+      });
+      if (clash.rows[0]) {
+        const keepId = Number(clash.rows[0].id);
+        await client.execute({
+          sql: `INSERT OR IGNORE INTO recipe_tags (recipe_id, tag_id)
+                SELECT recipe_id, ? FROM recipe_tags WHERE tag_id = ?`,
+          args: [keepId, id],
+        });
+        await client.execute({
+          sql: "DELETE FROM recipe_tags WHERE tag_id = ?",
+          args: [id],
+        });
+        await client.execute({ sql: "DELETE FROM tags WHERE id = ?", args: [id] });
+        return "merged";
+      }
+      await client.execute({
+        sql: "UPDATE tags SET name = ? WHERE id = ?",
+        args: [name, id],
+      });
+      return "renamed";
+    },
+
+    async deleteTag(id: number): Promise<boolean> {
+      await client.execute({
+        sql: "DELETE FROM recipe_tags WHERE tag_id = ?",
+        args: [id],
+      });
+      const rs = await client.execute({
+        sql: "DELETE FROM tags WHERE id = ?",
         args: [id],
       });
       return rs.rowsAffected > 0;

@@ -107,6 +107,11 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
     setTagInput('');
   }
 
+  // Existing tags the recipe hasn't picked yet — offered as one-tap chips.
+  const unusedSuggestions = tagSuggestions.filter(
+    (s) => !tags.some((t) => t.toLowerCase() === s.toLowerCase()),
+  );
+
   function onTagKeyDown(e) {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
@@ -291,17 +296,23 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={onTagKeyDown}
-            list="tag-suggestions"
             placeholder={tags.length === 0 ? 'e.g. Wing Sauces' : ''}
           />
-          <datalist id="tag-suggestions">
-            {tagSuggestions
-              .filter((s) => !tags.some((t) => t.toLowerCase() === s.toLowerCase()))
-              .map((s) => (
-                <option key={s} value={s} />
-              ))}
-          </datalist>
         </div>
+        {unusedSuggestions.length > 0 && (
+          <div className="tag-suggestions">
+            {unusedSuggestions.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className="tag-suggestion"
+                onClick={() => addTag(s)}
+              >
+                + {s}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="photo-field">
         <span className="field-title">Photo</span>
