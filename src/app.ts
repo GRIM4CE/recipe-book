@@ -209,7 +209,12 @@ export function createApp(opts: AppOptions) {
           categoryId: category?.id ?? null,
         });
       }
-      res.json({ recipes });
+      // Backward-compat: web bundles predating the multi-recipe picker read the
+      // recipe fields off the response root (e.g. `body.ingredients`). Spread
+      // the first recipe alongside `recipes` so those still-cached clients keep
+      // working; current clients read `recipes`. recipes[0] always exists here
+      // (empty results returned 422 above).
+      res.json({ recipes, ...recipes[0] });
     },
   );
 

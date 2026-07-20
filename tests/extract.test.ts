@@ -107,18 +107,17 @@ describe("POST /api/extract", () => {
       .post("/api/extract")
       .send({ text: "pancake recipe blob" });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({
-      recipes: [
-        {
-          title: "Pancakes",
-          summary: "Fluffy weekend pancakes",
-          servings: "4",
-          ingredients: ["2 cups flour", "2 eggs"],
-          instructions: ["Mix everything.", "Fry in butter."],
-          categoryId: breakfastId,
-        },
-      ],
-    });
+    const pancakeOut = {
+      title: "Pancakes",
+      summary: "Fluffy weekend pancakes",
+      servings: "4",
+      ingredients: ["2 cups flour", "2 eggs"],
+      instructions: ["Mix everything.", "Fry in butter."],
+      categoryId: breakfastId,
+    };
+    // Response carries `recipes` and, for older cached web bundles, the first
+    // recipe's fields spread at the top level.
+    expect(res.body).toEqual({ recipes: [pancakeOut], ...pancakeOut });
     expect(calls[0].text).toBe("pancake recipe blob");
     expect(calls[0].categoryNames).toEqual(["Breakfast"]);
   });
