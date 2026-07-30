@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { filterRecipes } from '../filter.js';
 import RecipeCard from './RecipeCard.jsx';
 
@@ -8,6 +8,7 @@ export default function RecipeGrid({ recipes, categories }) {
   const [tag, setTag] = useState(null);
   const [ingredient, setIngredient] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const stackRef = useRef(null);
   const tagNames = [...new Set(recipes.flatMap((r) => r.tags ?? []))].sort((a, b) =>
     a.localeCompare(b),
   );
@@ -18,6 +19,18 @@ export default function RecipeGrid({ recipes, categories }) {
   const hiddenCount = (tag ? 1 : 0) + (ingredient.trim() ? 1 : 0);
   const hasFilters =
     Boolean(query.trim()) || categoryId != null || tag != null || Boolean(ingredient.trim());
+
+  // The stack claims whatever height the search and filters leave over; CSS then
+  // divides it across the cards, so a longer list packs tighter on its own.
+  useEffect(() => {
+    const el = stackRef.current;
+    if (!el) return;
+    const measure = () =>
+      el.style.setProperty('--stack-top', `${el.getBoundingClientRect().top + window.scrollY}px`);
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [filtersOpen, visible.length === 0]);
 
   function clearFilters() {
     setQuery('');
@@ -119,7 +132,7 @@ export default function RecipeGrid({ recipes, categories }) {
       {visible.length === 0 ? (
         <p className="notice">No recipes match. Time to invent one?</p>
       ) : (
-        <div className="grid">
+        <div className="stack" ref={stackRef}>
           {visible.map((r) => (
             <RecipeCard key={r.id} recipe={r} />
           ))}

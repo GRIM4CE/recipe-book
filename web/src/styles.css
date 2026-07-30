@@ -117,72 +117,99 @@ body {
   background: var(--chip-color);
 }
 
-/* Card grid */
+/* Card stack. Cards are slats that overlap the one above; flexbox splits the
+   leftover viewport height between them, so the more recipes are on screen the
+   more compact each slat gets — down to --card-slim, past which the page
+   scrolls. Each card is its own size container: the ingredient hint is the
+   first thing to go once the slats tighten (see the @container below). */
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 16px;
+.stack {
+  --card-title-size: clamp(1.1rem, 4.4vw, 1.25rem);
+  --card-lap: 20px;
+  /* The slimmest slat still shows a two-line title (2.4em) in full, whatever
+     the title size works out to; the roomiest adds room for the hint. */
+  --card-slim: calc(26px + var(--card-lap) + 2.4 * var(--card-title-size));
+  --card-roomy: calc(var(--card-slim) + 46px);
+  display: flex;
+  flex-direction: column;
+  max-width: 560px;
+  margin: 0 auto;
+  min-height: calc(
+    100dvh - var(--stack-top, 260px) - 48px - env(safe-area-inset-bottom)
+  );
 }
 
 .card {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  aspect-ratio: 3 / 4;
+  /* Basis 0 rather than auto: every slat gets the same slice whether its title
+     wraps or not. */
+  flex: 1 1 0;
+  min-height: var(--card-slim);
+  max-height: var(--card-roomy);
+  container-type: size;
+  position: relative;
+  padding: 20px 22px 0;
   background: var(--card-color);
-  border-radius: 18px;
+  border-radius: 26px 26px 0 0;
   overflow: hidden;
   color: var(--card-ink);
   text-decoration: none;
-  transition: transform 120ms ease, box-shadow 120ms ease;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  transition: transform 120ms ease;
+}
+
+/* Later cards paint over earlier ones, so pulling each one up hides the
+   bottom corners of its neighbour and reads as a stack. */
+.card + .card {
+  margin-top: calc(var(--card-lap) * -1);
+  box-shadow: 0 -3px 12px rgb(0 0 0 / 0.16);
 }
 
 .card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgb(0 0 0 / 0.15);
+  transform: translateY(-4px);
 }
 
-.card-art {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 12px 12px 0;
-  border-radius: 10px;
-  background: rgb(255 255 255 / 0.16);
-  overflow: hidden;
-}
-
-.card-art img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.card-monogram {
-  font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
-  font-size: clamp(3rem, 9vw, 4.5rem);
-  font-weight: 700;
-  opacity: 0.85;
-}
-
-.card-body {
-  padding: 12px 14px 14px;
+/* Nothing overlaps the last slat, so let it close itself off. */
+.card:last-child {
+  border-radius: 26px;
 }
 
 .card-title {
+  /* Two lines' worth of room either way, so the hint below sits at the same
+     height on every card. */
+  min-height: 2.4em;
   margin: 0;
-  font-size: 1.02rem;
-  font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: var(--card-title-size);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.card-hint {
+  display: none;
+  margin: 16px 0 0;
+  font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+  color: color-mix(in srgb, var(--card-color), #14100c 42%);
+}
+
+/* Container queries measure the content box — slat height minus its top
+   padding — and can't read custom properties, so this is a plain number: the
+   point where the hint clears the slat above it instead of being sliced in
+   half, with the largest title size accounted for. */
+@container (min-height: 110px) {
+  .card-hint {
+    display: block;
+  }
 }
 
 .card-category {
@@ -659,14 +686,9 @@ body {
 }
 
 @media (max-width: 480px) {
-  .grid {
-    /* minmax(0, …) so long card titles can't inflate the 1fr tracks */
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .card-title {
-    font-size: 0.95rem;
+  /* Cancel the app gutter so the slats run edge to edge. */
+  .stack {
+    margin: 0 -16px;
   }
 }
 
