@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inkFor } from '../src/components/RecipeCard.jsx';
+import { inkFor } from '../src/ink.js';
 
 const LIGHT = '#fff8ef';
 const DARK = '#2a2622';

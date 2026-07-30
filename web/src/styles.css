@@ -1,21 +1,13 @@
+/* Dark canvas always: the category colors are the whole design here, and they
+   only pop against it. */
 :root {
-  --bg: #faf5ec;
-  --ink: #2a2622;
-  --ink-soft: #8b8378;
-  --paper: #fffdf8;
-  --line: #e8e0d2;
+  --bg: #1c1b1a;
+  --ink: #f0eae0;
+  --ink-soft: #a89e90;
+  --paper: #262422;
+  --line: #3a3733;
   --card-ink: #fff8ef;
-  color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1c1b1a;
-    --ink: #f0eae0;
-    --ink-soft: #a89e90;
-    --paper: #262422;
-    --line: #3a3733;
-  }
+  color-scheme: dark;
 }
 
 * {
@@ -123,6 +115,31 @@ body {
    scrolls. Each card is its own size container: the ingredient hint is the
    first thing to go once the slats tighten (see the @container below). */
 
+/* One stack on a phone, two side by side once there's room for them. */
+.stacks {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.stacks > .stack {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .stacks {
+    max-width: none;
+  }
+}
+
+.stack-more {
+  padding: 20px 0 0;
+  font-size: 0.9rem;
+}
+
 .stack {
   --card-title-size: clamp(1.1rem, 4.4vw, 1.25rem);
   --card-lap: 20px;
@@ -132,8 +149,6 @@ body {
   --card-roomy: calc(var(--card-slim) + 46px);
   display: flex;
   flex-direction: column;
-  max-width: 560px;
-  margin: 0 auto;
   min-height: calc(
     100dvh - var(--stack-top, 260px) - 48px - env(safe-area-inset-bottom)
   );
@@ -222,18 +237,40 @@ body {
   opacity: 0.85;
 }
 
-/* Detail */
+/* Detail. The recipe opens as its own card: the whole page is the category
+   color, sitting on the dark canvas the way a slat does in the stack. */
 
 .detail {
-  max-width: 720px;
+  max-width: 560px;
   margin: 0 auto;
-}
-
-.detail-hero {
+  min-height: calc(100dvh - 150px);
+  padding: 18px 22px 28px;
   background: var(--card-color);
   color: var(--card-ink);
-  border-radius: 22px;
-  padding: 20px 24px 24px;
+  border-radius: 26px;
+}
+
+/* Everything on the card is tinted from the card's own ink, so a pale category
+   color gets dark chrome and a deep one gets light chrome. */
+.detail .btn.ghost,
+.detail .scale-btn {
+  color: inherit;
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+}
+
+/* Spelled out rather than currentColor: within this rule currentColor would
+   resolve to the color being set here, painting the pill invisible. */
+.detail .scale-btn.active {
+  background: var(--card-ink);
+  border-color: var(--card-ink);
+  color: var(--card-color);
+}
+
+.detail-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .back {
@@ -243,60 +280,69 @@ body {
   font-weight: 600;
   font-size: 0.9rem;
   opacity: 0.85;
-  margin-bottom: 10px;
 }
 
-.detail-hero h2 {
-  margin: 0 0 4px;
-  font-size: clamp(1.6rem, 5vw, 2.2rem);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+.detail-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.share-note {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+.detail-head {
+  text-align: center;
+  margin: 14px 0 26px;
+}
+
+.detail-title {
+  margin: 0;
+  font-size: clamp(1.35rem, 5.5vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .detail-summary {
-  margin: 10px 0 0;
-  opacity: 0.92;
+  margin: 12px 0 0;
   line-height: 1.45;
-}
-
-.detail-photo {
-  width: 100%;
-  margin-top: 16px;
-  border-radius: 12px;
-  display: block;
+  opacity: 0.92;
 }
 
 .detail-section {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 18px 22px;
-  margin-top: 16px;
+  margin-top: 22px;
 }
 
 .detail-section h3 {
-  margin: 0 0 10px;
-  font-size: 0.8rem;
+  margin: 0 0 8px;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--ink-soft);
+  opacity: 0.6;
 }
 
+/* The ingredient list is the card's signature: italic serif caps, set tight so
+   it reads as a block rather than a table. */
 .ingredients {
   margin: 0;
   padding: 0;
   list-style: none;
+  font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(1.05rem, 4.4vw, 1.3rem);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .ingredients li {
-  padding: 7px 0;
-  border-bottom: 1px dashed var(--line);
-  line-height: 1.4;
-}
-
-.ingredients li:last-child {
-  border-bottom: none;
+  padding: 2px 0;
+  line-height: 1.3;
 }
 
 .ingredients-header {
@@ -311,7 +357,7 @@ body {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .scale-btn {
@@ -326,31 +372,25 @@ body {
   cursor: pointer;
 }
 
-.scale-btn.active {
-  background: var(--ink);
-  color: var(--paper);
-  border-color: var(--ink);
-}
-
 .servings {
-  margin: 0 0 8px;
-  color: var(--ink-soft);
+  margin: 0 0 10px;
   font-size: 0.9rem;
+  opacity: 0.75;
 }
 
 .instructions {
   margin: 0;
-  padding-left: 22px;
+  padding-left: 20px;
 }
 
 .instructions li {
-  padding: 6px 0 6px 6px;
+  padding: 5px 0 5px 4px;
   line-height: 1.5;
 }
 
 .instructions li::marker {
   font-weight: 700;
-  color: var(--ink-soft);
+  opacity: 0.6;
 }
 
 .notes {
@@ -363,8 +403,8 @@ body {
 .notes a {
   color: inherit;
   text-decoration: underline;
-  text-decoration-color: var(--ink-soft);
   text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, currentColor 55%, transparent);
 }
 
 .instructions a:hover,
@@ -376,35 +416,18 @@ body {
   font-weight: 600;
 }
 
+.detail-photo {
+  display: block;
+  width: 100%;
+  margin: 26px 0 0;
+  border-radius: 16px;
+}
+
 .detail-meta {
-  color: var(--ink-soft);
   font-size: 0.85rem;
   text-align: center;
-  margin: 22px 0 0;
-}
-
-.detail-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.detail-topbar .back {
-  margin-bottom: 0;
-}
-
-.detail-top-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.share-note {
-  color: var(--ink-soft);
-  font-size: 0.85rem;
-  white-space: nowrap;
+  margin: 26px 0 0;
+  opacity: 0.7;
 }
 
 /* Buttons */
@@ -687,8 +710,13 @@ body {
 
 @media (max-width: 480px) {
   /* Cancel the app gutter so the slats run edge to edge. */
-  .stack {
+  .stacks {
     margin: 0 -16px;
+  }
+
+  .detail {
+    margin: 0 -16px;
+    border-radius: 26px 26px 0 0;
   }
 }
 
