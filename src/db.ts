@@ -200,6 +200,16 @@ export function createDb(client: Client) {
       );
     },
 
+    // Titles are the recipe's identity in the stack, so they're kept unique
+    // case-insensitively. Returns the id holding the title, if any.
+    async findRecipeIdByTitle(title: string): Promise<number | null> {
+      const rs = await client.execute({
+        sql: "SELECT id FROM recipes WHERE title = ? COLLATE NOCASE",
+        args: [title],
+      });
+      return rs.rows[0] ? Number(rs.rows[0].id) : null;
+    },
+
     async createRecipe(input: RecipeInput, meta: RecipeMeta): Promise<Recipe> {
       const now = new Date().toISOString();
       const rs = await client.execute({

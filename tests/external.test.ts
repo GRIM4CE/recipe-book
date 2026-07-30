@@ -105,6 +105,17 @@ describe("external recipe import", () => {
     ).toBe(400);
   });
 
+  it("refuses a title the book already holds", async () => {
+    expect(
+      (
+        await request(app)
+          .post("/api/external/recipes")
+          .set(auth)
+          .send({ title: "pushed ragù" })
+      ).status,
+    ).toBe(409);
+  });
+
   it("presigns uploads with the secret", async () => {
     expect((await request(app).post("/api/external/uploads")).status).toBe(401);
     const res = await request(app).post("/api/external/uploads").set(auth);
