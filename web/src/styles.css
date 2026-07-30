@@ -109,11 +109,10 @@ body {
   background: var(--chip-color);
 }
 
-/* Card stack. Cards are slats that overlap the one above; flexbox splits the
-   leftover viewport height between them, so the more recipes are on screen the
-   more compact each slat gets — down to --card-slim, past which the page
-   scrolls. Each card is its own size container: the ingredient hint is the
-   first thing to go once the slats tighten (see the @container below). */
+/* Card stack. Cards are slats that overlap the one above, each holding a whole
+   recipe. A slat is never shorter than its recipe, and when the list is short
+   enough to leave room, flexbox shares the leftover viewport height out between
+   them so the stack still fills the screen. */
 
 /* One stack on a phone, two side by side once there's room for them. */
 .stacks {
@@ -143,10 +142,8 @@ body {
 .stack {
   --card-title-size: clamp(1.1rem, 4.4vw, 1.25rem);
   --card-lap: 20px;
-  /* The slimmest slat still shows a two-line title (2.4em) in full, whatever
-     the title size works out to; the roomiest adds room for the hint. */
+  /* Floor for a recipe with nothing in it but a title. */
   --card-slim: calc(26px + var(--card-lap) + 2.4 * var(--card-title-size));
-  --card-roomy: calc(var(--card-slim) + 46px);
   display: flex;
   flex-direction: column;
   min-height: calc(
@@ -155,14 +152,14 @@ body {
 }
 
 .card {
-  /* Basis 0 rather than auto: every slat gets the same slice whether its title
-     wraps or not. */
-  flex: 1 1 0;
+  /* Grow into spare height, but never shrink below the recipe: basis auto is
+     the slat's own content. */
+  flex: 1 0 auto;
   min-height: var(--card-slim);
-  max-height: var(--card-roomy);
-  container-type: size;
   position: relative;
-  padding: 20px 22px 0;
+  /* The bottom padding clears the slat that overlaps this one, so the last line
+     of the recipe never ends up underneath it. */
+  padding: 20px 22px calc(var(--card-lap) + 10px);
   background: var(--card-color);
   border-radius: 26px 26px 0 0;
   overflow: hidden;
@@ -188,7 +185,7 @@ body {
 }
 
 .card-title {
-  /* Two lines' worth of room either way, so the hint below sits at the same
+  /* Two lines' worth of room either way, so the recipe below starts at the same
      height on every card. */
   min-height: 2.4em;
   margin: 0;
@@ -203,28 +200,27 @@ body {
   text-transform: uppercase;
 }
 
-.card-hint {
-  display: none;
-  margin: 16px 0 0;
-  font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
-  font-style: italic;
-  font-size: 1.05rem;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* The recipe itself, in the same tinted ink the detail card uses. */
+.card-preview {
   color: color-mix(in srgb, var(--card-color), #14100c 42%);
 }
 
-/* Container queries measure the content box — slat height minus its top
-   padding — and can't read custom properties, so this is a plain number: the
-   point where the hint clears the slat above it instead of being sliced in
-   half, with the largest title size accounted for. */
-@container (min-height: 110px) {
-  .card-hint {
-    display: block;
-  }
+.card-ingredients {
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.card-steps {
+  margin: 14px 0 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
 
 .card-category {
