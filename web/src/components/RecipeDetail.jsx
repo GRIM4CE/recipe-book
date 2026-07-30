@@ -55,7 +55,7 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
   return (
     <article className="detail" style={{ '--card-color': color, '--card-ink': inkFor(color) }}>
       <div className="detail-topbar">
-        <a className="back" href="#/">‹ All recipes</a>
+        <a className="btn ghost small back" href="#/">‹ Back</a>
         <div className="detail-top-actions">
           {shareNote && <span className="share-note">{shareNote}</span>}
           <button className="btn ghost small" type="button" onClick={share}>

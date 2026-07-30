@@ -21,12 +21,11 @@ function useTwoColumns() {
   return two;
 }
 
-export default function RecipeGrid({ recipes, categories }) {
-  const [query, setQuery] = useState('');
-  const [categoryId, setCategoryId] = useState(null);
-  const [tag, setTag] = useState(null);
-  const [ingredient, setIngredient] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(false);
+// Search, filters and scroll position live in App so they survive the trip
+// into a recipe and back: the list you return to is the list you left.
+export default function RecipeGrid({ recipes, categories, filters, onFilters, scrollRef }) {
+  const { query, categoryId, tag, ingredient, filtersOpen } = filters;
+  const set = (patch) => onFilters({ ...filters, ...patch });
   const stacksRef = useRef(null);
   const twoColumns = useTwoColumns();
   const tagNames = [...new Set(recipes.flatMap((r) => r.tags ?? []))].sort((a, b) =>
@@ -56,11 +55,15 @@ export default function RecipeGrid({ recipes, categories }) {
     return () => window.removeEventListener('resize', measure);
   }, [filtersOpen, visible.length === 0]);
 
+  // Put the reader back where they were. The position is banked on the way out
+  // (see the stack's onClickCapture) rather than on unmount, because following
+  // a card's link scrolls the page to the top before React hears about it.
+  useEffect(() => {
+    window.scrollTo(0, scrollRef.current);
+  }, [scrollRef]);
+
   function clearFilters() {
-    setQuery('');
-    setCategoryId(null);
-    setTag(null);
-    setIngredient('');
+    set({ query: '', categoryId: null, tag: null, ingredient: '' });
   }
 
   // Draws from everything that matched, not just the slats on screen.
@@ -77,14 +80,14 @@ export default function RecipeGrid({ recipes, categories }) {
         type="search"
         placeholder="Search recipes, ingredients…"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => set({ query: e.target.value })}
       />
       <div className="chips" role="tablist">
         <button
           type="button"
           className={categoryId === null ? 'chip active' : 'chip'}
           style={{ '--chip-color': '#8b8378' }}
-          onClick={() => setCategoryId(null)}
+          onClick={() => set({ categoryId: null })}
         >
           All
         </button>
@@ -94,7 +97,7 @@ export default function RecipeGrid({ recipes, categories }) {
             type="button"
             className={categoryId === c.id ? 'chip active' : 'chip'}
             style={{ '--chip-color': c.color }}
-            onClick={() => setCategoryId(categoryId === c.id ? null : c.id)}
+            onClick={() => set({ categoryId: categoryId === c.id ? null : c.id })}
           >
             {c.name}
           </button>
@@ -106,7 +109,7 @@ export default function RecipeGrid({ recipes, categories }) {
           type="button"
           className="btn ghost small"
           aria-expanded={filtersOpen}
-          onClick={() => setFiltersOpen((open) => !open)}
+          onClick={() => set({ filtersOpen: !filtersOpen })}
         >
           Filters{hiddenCount > 0 ? ` (${hiddenCount})` : ''} {filtersOpen ? '▲' : '▼'}
         </button>
@@ -124,7 +127,7 @@ export default function RecipeGrid({ recipes, categories }) {
             <input
               type="text"
               value={ingredient}
-              onChange={(e) => setIngredient(e.target.value)}
+              onChange={(e) => set({ ingredient: e.target.value })}
               placeholder="e.g. campari"
             />
           </label>
@@ -136,7 +139,7 @@ export default function RecipeGrid({ recipes, categories }) {
                   type="button"
                   className={tag === t ? 'chip active' : 'chip'}
                   style={{ '--chip-color': '#8b8378' }}
-                  onClick={() => setTag(tag === t ? null : t)}
+                  onClick={() => set({ tag: tag === t ? null : t })}
                 >
                   #{t}
                 </button>
@@ -158,7 +161,13 @@ export default function RecipeGrid({ recipes, categories }) {
         <p className="notice">No recipes match. Time to invent one?</p>
       ) : (
         <>
-          <div className="stacks" ref={stacksRef}>
+          <div
+            className="stacks"
+            ref={stacksRef}
+            onClickCapture={() => {
+              scrollRef.current = window.scrollY;
+            }}
+          >
             {columns.map((column, i) => (
               // The count drives how thin a slat gets: the screen is split this
               // many ways.
