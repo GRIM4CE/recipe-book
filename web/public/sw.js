@@ -2,7 +2,7 @@
 // shell available offline. Recipe data and photos are never cached — those
 // requests always go to the network so the collection is never stale.
 
-const CACHE = 'recipe-book-v1';
+const CACHE = 'recipe-book-v2';
 const SHELL = ['/', '/manifest.webmanifest', '/favicon.svg', '/icon-192.png'];
 
 self.addEventListener('install', (event) => {
@@ -20,6 +20,35 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+function keep(request, res) {
+  if (res.ok && res.type === 'basic') {
+    const copy = res.clone();
+    caches.open(CACHE).then((cache) => cache.put(request, copy));
+  }
+  return res;
+}
+
+// The page itself always goes to the network first. It names the hashed
+// bundles, so answering it from cache pins an installed app to the build it
+// was installed on and a deploy only lands on some later reload, if ever.
+async function networkFirst(request) {
+  try {
+    return keep(request, await fetch(request));
+  } catch {
+    return (await caches.match(request)) ?? (await caches.match('/'));
+  }
+}
+
+// Everything else is content-hashed or static: serve it straight from the
+// cache and refresh the copy in the background.
+async function staleWhileRevalidate(request) {
+  const cached = await caches.match(request);
+  const network = fetch(request)
+    .then((res) => keep(request, res))
+    .catch(() => cached);
+  return cached ?? network;
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   // Writes must always hit the network.
@@ -31,20 +60,7 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/photos/')) return;
   if (url.pathname === '/healthz') return;
 
-  // App shell and static assets: serve from cache, revalidate in the
-  // background, and fall back to the cached shell when offline.
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
-        .then((res) => {
-          if (res.ok && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(CACHE).then((cache) => cache.put(request, copy));
-          }
-          return res;
-        })
-        .catch(() => cached || (request.mode === 'navigate' ? caches.match('/') : undefined));
-      return cached || network;
-    }),
+    request.mode === 'navigate' ? networkFirst(request) : staleWhileRevalidate(request),
   );
 });
