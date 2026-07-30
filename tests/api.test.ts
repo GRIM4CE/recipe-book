@@ -138,6 +138,64 @@ describe("recipes", () => {
     );
     expect((await request(app).delete(`/api/recipes/${id}`)).status).toBe(404);
   });
+
+  it("keeps titles unique, case-insensitively", async () => {
+    const created = await request(app).post("/api/recipes").send({ title: "Risotto" });
+    expect(created.status).toBe(201);
+
+    const clash = await request(app).post("/api/recipes").send({ title: "risotto" });
+    expect(clash.status).toBe(409);
+
+    const other = await request(app).post("/api/recipes").send({ title: "Polenta" });
+    expect(
+      (await request(app).put(`/api/recipes/${other.body.id}`).send({ title: "RISOTTO" }))
+        .status,
+    ).toBe(409);
+
+    // Saving a recipe under the title it already holds is not a clash.
+    const resaved = await request(app)
+      .put(`/api/recipes/${created.body.id}`)
+      .send({ title: "Risotto", servings: "2" });
+    expect(resaved.status).toBe(200);
+    expect(resaved.body.servings).toBe("2");
+  });
+
+  it("duplicates a recipe under its own name", async () => {
+    const cat = await request(app)
+      .post("/api/categories")
+      .send({ name: "Suppers", color: "#4C9BE8" });
+    const created = await request(app).post("/api/recipes").send({
+      title: "Congee",
+      summary: "Slow rice.",
+      servings: "4",
+      notes: "Ginger on top.",
+      ingredients: ["rice", "stock"],
+      instructions: ["simmer"],
+      tags: ["Comfort"],
+      categoryId: cat.body.id,
+    });
+
+    const copy = await request(app).post(`/api/recipes/${created.body.id}/duplicate`);
+    expect(copy.status).toBe(201);
+    expect(copy.body.id).not.toBe(created.body.id);
+    expect(copy.body.title).toBe("Congee (copy)");
+    expect(copy.body.summary).toBe("Slow rice.");
+    expect(copy.body.servings).toBe("4");
+    expect(copy.body.notes).toBe("Ginger on top.");
+    expect(copy.body.ingredients).toEqual(["rice", "stock"]);
+    expect(copy.body.instructions).toEqual(["simmer"]);
+    expect(copy.body.tags).toEqual(["Comfort"]);
+    expect(copy.body.category.id).toBe(cat.body.id);
+
+    // A second copy steps past the name the first one took.
+    const again = await request(app).post(`/api/recipes/${created.body.id}/duplicate`);
+    expect(again.body.title).toBe("Congee (copy 2)");
+    // As does a copy of the copy.
+    const nested = await request(app).post(`/api/recipes/${copy.body.id}/duplicate`);
+    expect(nested.body.title).toBe("Congee (copy) (copy)");
+
+    expect((await request(app).post("/api/recipes/999999/duplicate")).status).toBe(404);
+  });
 });
 
 describe("schema migration", () => {

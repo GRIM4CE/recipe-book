@@ -43,6 +43,7 @@ export const api = {
   updateRecipe: (id, data) =>
     authed(`/api/recipes/${id}`, { method: 'PUT', body: json(data) }),
   deleteRecipe: (id) => authed(`/api/recipes/${id}`, { method: 'DELETE' }),
+  duplicateRecipe: (id) => authed(`/api/recipes/${id}/duplicate`, { method: 'POST' }),
 
   // Presign, PUT the bytes directly to storage, return the stored key.
   uploadPhoto: async (blob) => {

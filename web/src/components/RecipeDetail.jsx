@@ -13,9 +13,10 @@ const SCALES = [
   { label: '8×', factor: 8 },
 ];
 
-export default function RecipeDetail({ recipe, recipes = [], canEdit }) {
+export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicate }) {
   const [factor, setFactor] = useState(1);
   const [shareNote, setShareNote] = useState('');
+  const [copying, setCopying] = useState(false);
   const color = recipe.category?.color ?? '#8b8378';
   const added = new Date(recipe.createdAt).toLocaleDateString(undefined, {
     year: 'numeric',
@@ -60,6 +61,20 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit }) {
           <button className="btn ghost small" type="button" onClick={share}>
             Share
           </button>
+          {canEdit && (
+            <button
+              className="btn ghost small"
+              type="button"
+              disabled={copying}
+              onClick={async () => {
+                setCopying(true);
+                await onDuplicate(recipe);
+                setCopying(false);
+              }}
+            >
+              {copying ? 'Duplicating…' : 'Duplicate'}
+            </button>
+          )}
           {canEdit && (
             <a className="btn ghost small" href={`#/recipes/${recipe.id}/edit`}>
               Edit

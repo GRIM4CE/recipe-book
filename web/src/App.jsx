@@ -32,7 +32,7 @@ export default function App() {
   const [error, setError] = useState(null);
 
   const reload = useCallback(() => {
-    Promise.all([api.listRecipes(), api.listCategories(), api.listTags()])
+    return Promise.all([api.listRecipes(), api.listCategories(), api.listTags()])
       .then(([r, c, t]) => {
         setRecipes(r);
         setCategories(c);
@@ -42,7 +42,11 @@ export default function App() {
       .catch((err) => setError(err.message));
   }, []);
 
-  useEffect(reload, [reload]);
+  // Wrapped: reload returns a promise now, and an effect may only return a
+  // cleanup function.
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   useEffect(() => {
     setOfferPasskey(Boolean(user) && !devMode && !hasDevicePasskey());
@@ -60,6 +64,18 @@ export default function App() {
   function onSaved(recipe) {
     reload();
     window.location.hash = `#/recipes/${recipe.id}`;
+  }
+
+  // Lands on the copy's edit form: duplicating is how you start a variation,
+  // so the next step is always changing something.
+  async function onDuplicateRecipe(recipe) {
+    try {
+      const copy = await api.duplicateRecipe(recipe.id);
+      await reload();
+      window.location.hash = `#/recipes/${copy.id}/edit`;
+    } catch (err) {
+      window.alert(err.message);
+    }
   }
 
   // Confirmation is handled by the edit form's modal before this runs.
@@ -142,7 +158,12 @@ export default function App() {
   } else if (detailMatch) {
     const recipe = findRecipe(detailMatch[1]);
     page = recipe ? (
-      <RecipeDetail recipe={recipe} recipes={recipes} canEdit={Boolean(user)} />
+      <RecipeDetail
+        recipe={recipe}
+        recipes={recipes}
+        canEdit={Boolean(user)}
+        onDuplicate={onDuplicateRecipe}
+      />
     ) : (
       <p className="notice">That recipe doesn’t exist (anymore).</p>
     );

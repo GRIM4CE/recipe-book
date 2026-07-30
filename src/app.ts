@@ -280,6 +280,15 @@ export function createApp(opts: AppOptions) {
     res.json(serialize(recipe));
   });
 
+  // "Pancakes" -> "Pancakes (copy)" -> "Pancakes (copy 2)": the first name
+  // nobody holds. Terminates — there are only ever finitely many taken names.
+  async function copyTitle(title: string): Promise<string> {
+    for (let n = 1; ; n++) {
+      const candidate = n === 1 ? `${title} (copy)` : `${title} (copy ${n})`;
+      if ((await db.findRecipeIdByTitle(candidate)) == null) return candidate;
+    }
+  }
+
   app.post("/api/recipes", writeAuth, async (req, res) => {
     const input = parseRecipeInput(req.body);
     if (typeof input === "string") {
@@ -288,6 +297,10 @@ export function createApp(opts: AppOptions) {
     }
     if (input.categoryId != null && !(await db.getCategory(input.categoryId))) {
       res.status(400).json({ error: "unknown category" });
+      return;
+    }
+    if ((await db.findRecipeIdByTitle(input.title)) != null) {
+      res.status(409).json({ error: "a recipe with that title already exists" });
       return;
     }
     const recipe = await db.createRecipe(input, {
@@ -307,12 +320,40 @@ export function createApp(opts: AppOptions) {
       res.status(400).json({ error: "unknown category" });
       return;
     }
+    const holder = await db.findRecipeIdByTitle(input.title);
+    if (holder != null && holder !== Number(req.params.id)) {
+      res.status(409).json({ error: "a recipe with that title already exists" });
+      return;
+    }
     const recipe = await db.updateRecipe(Number(req.params.id), input);
     if (!recipe) {
       res.status(404).json({ error: "recipe not found" });
       return;
     }
     res.json(serialize(recipe));
+  });
+
+  app.post("/api/recipes/:id/duplicate", writeAuth, async (req, res) => {
+    const original = await db.getRecipe(Number(req.params.id));
+    if (!original) {
+      res.status(404).json({ error: "recipe not found" });
+      return;
+    }
+    const copy = await db.createRecipe(
+      {
+        title: await copyTitle(original.title),
+        summary: original.summary,
+        servings: original.servings,
+        ingredients: original.ingredients,
+        instructions: original.instructions,
+        notes: original.notes,
+        categoryId: original.category?.id ?? null,
+        tags: original.tags,
+        photoKey: original.photoKey,
+      },
+      { createdBy: String(res.locals.username), source: "web" },
+    );
+    res.status(201).json(serialize(copy));
   });
 
   app.delete("/api/recipes/:id", writeAuth, async (req, res) => {

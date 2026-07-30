@@ -44,6 +44,12 @@ export function createExternalRouter(opts: {
         return;
       }
     }
+    // Same unique-title rule the UI enforces: an importer that runs twice gets
+    // told so rather than quietly making a second copy.
+    if ((await opts.db.findRecipeIdByTitle(b.title.trim())) != null) {
+      res.status(409).json({ error: "a recipe with that title already exists" });
+      return;
+    }
     // Category is matched by name or dropped — the importer must never
     // invent categories; those are managed in the UI.
     let categoryId: number | null = null;
