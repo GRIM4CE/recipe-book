@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import { currentUser, devMode, hasDevicePasskey, logout, registerPasskey } from './auth.js';
 import Categories from './components/Categories.jsx';
@@ -30,6 +30,16 @@ export default function App() {
   const [categories, setCategories] = useState([]);
   const [tags, setTags] = useState([]);
   const [error, setError] = useState(null);
+  // Held here, not in RecipeGrid, so opening a recipe and coming back lands on
+  // the list exactly as it was left.
+  const [filters, setFilters] = useState({
+    query: '',
+    categoryId: null,
+    tag: null,
+    ingredient: '',
+    filtersOpen: false,
+  });
+  const listScroll = useRef(0);
 
   const reload = useCallback(() => {
     return Promise.all([api.listRecipes(), api.listCategories(), api.listTags()])
@@ -168,30 +178,44 @@ export default function App() {
       <p className="notice">That recipe doesn’t exist (anymore).</p>
     );
   } else {
-    page = <RecipeGrid recipes={recipes} categories={categories} />;
+    page = (
+      <RecipeGrid
+        recipes={recipes}
+        categories={categories}
+        filters={filters}
+        onFilters={setFilters}
+        scrollRef={listScroll}
+      />
+    );
   }
 
+  // A recipe fills the screen on its own: no wordmark, no nav, just the card
+  // and its own back button.
+  const bare = Boolean(detailMatch) && !error;
+
   return (
-    <div className="app">
-      <header className="header">
-        <a href="#/" className="wordmark">Recipe Book</a>
-        <nav className="nav">
-          {user ? (
-            <>
-              <a className="btn primary small" href="#/new">+ Recipe</a>
-              <a className="btn ghost small" href="#/categories">Categories</a>
-              <a className="btn ghost small" href="#/tags">Tags</a>
-              <a className="icon-btn" href="#/settings" aria-label="Settings" title="Settings">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
-                  <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
-                </svg>
-              </a>
-            </>
-          ) : showSignIn ? (
-            <a className="btn ghost small" href="#/login">Sign in</a>
-          ) : null}
-        </nav>
-      </header>
+    <div className={bare ? 'app bare' : 'app'}>
+      {!bare && (
+        <header className="header">
+          <a href="#/" className="wordmark">Recipe Book</a>
+          <nav className="nav">
+            {user ? (
+              <>
+                <a className="btn primary small" href="#/new">+ Recipe</a>
+                <a className="btn ghost small" href="#/categories">Categories</a>
+                <a className="btn ghost small" href="#/tags">Tags</a>
+                <a className="icon-btn" href="#/settings" aria-label="Settings" title="Settings">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                    <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
+                  </svg>
+                </a>
+              </>
+            ) : showSignIn ? (
+              <a className="btn ghost small" href="#/login">Sign in</a>
+            ) : null}
+          </nav>
+        </header>
+      )}
       <main>
         {offerPasskey && (
           <p className="notice">

@@ -242,14 +242,21 @@ body {
 /* Detail. The recipe opens as its own card: the whole page is the category
    color, sitting on the dark canvas the way a slat does in the stack. */
 
+/* A recipe page is the card and nothing else — App drops the header, and this
+   leaves a hair of canvas above it. */
+.app.bare {
+  padding-top: 1rem;
+  padding-bottom: 0;
+}
+
 .detail {
   max-width: 560px;
   margin: 0 auto;
-  min-height: calc(100dvh - 150px);
-  padding: 18px 22px 28px;
+  min-height: calc(100dvh - 1rem);
+  padding: 18px 22px calc(28px + env(safe-area-inset-bottom));
   background: var(--card-color);
   color: var(--card-ink);
-  border-radius: 26px;
+  border-radius: 26px 26px 0 0;
 }
 
 /* Everything on the card is tinted from the card's own ink, so a pale category
@@ -277,13 +284,10 @@ body {
   gap: 10px;
 }
 
+/* The way back out of a recipe, weighted like the actions beside it. */
 .back {
-  display: inline-block;
   color: inherit;
   text-decoration: none;
-  font-weight: 600;
-  font-size: 0.9rem;
-  opacity: 0.85;
 }
 
 .detail-top-actions {
@@ -720,7 +724,6 @@ body {
 
   .detail {
     margin: 0 -16px;
-    border-radius: 26px 26px 0 0;
   }
 }
 
