@@ -160,7 +160,9 @@ export default function RecipeGrid({ recipes, categories }) {
         <>
           <div className="stacks" ref={stacksRef}>
             {columns.map((column, i) => (
-              <div className="stack" key={i}>
+              // The count drives how thin a slat gets: the screen is split this
+              // many ways.
+              <div className="stack" key={i} style={{ '--stack-count': column.length }}>
                 {column.map((r) => (
                   <RecipeCard key={r.id} recipe={r} />
                 ))}

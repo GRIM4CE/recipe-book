@@ -110,9 +110,10 @@ body {
 }
 
 /* Card stack. Cards are slats that overlap the one above, each holding a whole
-   recipe. A slat is never shorter than its recipe, and when the list is short
-   enough to leave room, flexbox shares the leftover viewport height out between
-   them so the stack still fills the screen. */
+   recipe but showing only the slice of it the stack can spare: the screen is
+   split between however many slats there are, so a handful show a good part of
+   their recipe and a long list narrows to titles. The last slat is the
+   exception — nothing covers it, so it keeps its recipe whole. */
 
 /* One stack on a phone, two side by side once there's room for them. */
 .stacks {
@@ -144,18 +145,18 @@ body {
   --card-lap: 20px;
   /* Floor for a recipe with nothing in it but a title. */
   --card-slim: calc(26px + var(--card-lap) + 2.4 * var(--card-title-size));
+  /* What's left of the screen below the filters, split --stack-count ways. */
+  --card-slice: calc(
+    (100dvh - var(--stack-top, 260px) - 48px - env(safe-area-inset-bottom)) /
+      var(--stack-count, 6)
+  );
   display: flex;
   flex-direction: column;
-  min-height: calc(
-    100dvh - var(--stack-top, 260px) - 48px - env(safe-area-inset-bottom)
-  );
 }
 
 .card {
-  /* Grow into spare height, but never shrink below the recipe: basis auto is
-     the slat's own content. */
-  flex: 1 0 auto;
-  min-height: var(--card-slim);
+  flex: none;
+  height: max(var(--card-slim), var(--card-slice));
   position: relative;
   /* The bottom padding clears the slat that overlaps this one, so the last line
      of the recipe never ends up underneath it. */
@@ -179,15 +180,18 @@ body {
   transform: translateY(-4px);
 }
 
-/* Nothing overlaps the last slat, so let it close itself off. */
+/* Nothing overlaps the last slat: it closes itself off and, since there's no
+   card to cut it short, shows its recipe in full. */
 .card:last-child {
+  height: auto;
+  min-height: max(var(--card-slim), var(--card-slice));
   border-radius: 26px;
 }
 
 .card-title {
   /* Two lines' worth of room either way, so the recipe below starts at the same
      height on every card. */
-  min-height: 2.4em;
+  min-height: 2.2em;
   margin: 0;
   display: flex;
   align-items: center;
@@ -206,7 +210,7 @@ body {
 }
 
 .card-ingredients {
-  margin: 20px 0 0;
+  margin: 12px 0 0;
   padding: 0;
   list-style: none;
   font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
