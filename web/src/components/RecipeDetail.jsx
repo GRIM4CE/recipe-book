@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { inkFor } from '../ink.js';
 import { scaleIngredient, scaleServings } from '../scale.js';
 import RichText from './RichText.jsx';
 
@@ -48,8 +49,10 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit }) {
     setTimeout(() => setShareNote(''), 2000);
   }
 
+  // The whole page is the recipe's card: same color and ink as its slat in the
+  // stack, opened up to hold the recipe itself.
   return (
-    <article className="detail">
+    <article className="detail" style={{ '--card-color': color, '--card-ink': inkFor(color) }}>
       <div className="detail-topbar">
         <a className="back" href="#/">‹ All recipes</a>
         <div className="detail-top-actions">
@@ -64,8 +67,9 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit }) {
           )}
         </div>
       </div>
-      <header className="detail-hero" style={{ '--card-color': color }}>
-        <h2>{recipe.title}</h2>
+
+      <header className="detail-head">
+        <h2 className="detail-title">{recipe.title}</h2>
         {recipe.category && (
           <span className="card-category">{recipe.category.name}</span>
         )}
@@ -79,9 +83,6 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit }) {
           </div>
         )}
         {recipe.summary && <p className="detail-summary">{recipe.summary}</p>}
-        {recipe.photoUrl && (
-          <img className="detail-photo" src={recipe.photoUrl} alt={recipe.title} />
-        )}
       </header>
 
       {recipe.ingredients.length > 0 && (
@@ -134,6 +135,10 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit }) {
             <RichText text={recipe.notes} recipes={recipes} excludeId={recipe.id} />
           </p>
         </section>
+      )}
+
+      {recipe.photoUrl && (
+        <img className="detail-photo" src={recipe.photoUrl} alt={recipe.title} />
       )}
 
       <p className="detail-meta">
