@@ -115,6 +115,12 @@ body {
    their recipe and a long list narrows to titles. The last slat is the
    exception — nothing covers it, so it keeps its recipe whole. */
 
+/* The stack ends where the screen does, so the page gutter under it is
+   cancelled — see .stack-more for the one case that puts it back. */
+.grid-page {
+  margin-bottom: calc(-48px - env(safe-area-inset-bottom));
+}
+
 /* One stack on a phone, two side by side once there's room for them. */
 .stacks {
   display: flex;
@@ -135,8 +141,10 @@ body {
   }
 }
 
+/* The only thing that ever sits under the stack, so it carries the gutter the
+   page gave up. */
 .stack-more {
-  padding: 20px 0 0;
+  padding: 20px 0 calc(48px + env(safe-area-inset-bottom));
   font-size: 0.9rem;
 }
 
@@ -145,11 +153,9 @@ body {
   --card-lap: 20px;
   /* Floor for a recipe with nothing in it but a title. */
   --card-slim: calc(26px + var(--card-lap) + 2.4 * var(--card-title-size));
-  /* What's left of the screen below the filters, split --stack-count ways. */
-  --card-slice: calc(
-    (100dvh - var(--stack-top, 260px) - 48px - env(safe-area-inset-bottom)) /
-      var(--stack-count, 6)
-  );
+  /* What's left of the screen below the filters, split --stack-count ways.
+     Nothing is subtracted for a bottom gutter — the stack runs to the edge. */
+  --card-slice: calc((100dvh - var(--stack-top, 260px)) / var(--stack-count, 6));
   display: flex;
   flex-direction: column;
 }
@@ -180,12 +186,13 @@ body {
   transform: translateY(-4px);
 }
 
-/* Nothing overlaps the last slat: it closes itself off and, since there's no
-   card to cut it short, shows its recipe in full. */
+/* Nothing overlaps the last slat, so it shows its recipe in full — and it runs
+   to the bottom of the screen whether that recipe fills it or not, which is why
+   only its top corners are rounded. */
 .card:last-child {
   height: auto;
   min-height: max(var(--card-slim), var(--card-slice));
-  border-radius: 26px;
+  padding-bottom: calc(var(--card-lap) + 10px + env(safe-area-inset-bottom));
 }
 
 .card-title {
@@ -202,11 +209,6 @@ body {
   line-height: 1.2;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-/* The recipe itself, in the same tinted ink the detail card uses. */
-.card-preview {
-  color: color-mix(in srgb, var(--card-color), #14100c 42%);
 }
 
 .card-ingredients {
