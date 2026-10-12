@@ -228,3 +228,48 @@ describe("tag management", () => {
     expect(await db.renameTag(99_999, "Ghost")).toBe("missing");
   });
 });
+
+describe("translations", () => {
+  const fields = {
+    title: "Pancakes",
+    summary: "",
+    servings: "4",
+    ingredients: ["2 tbsp sugar"],
+    instructions: ["Mix."],
+    notes: "",
+  };
+
+  it("upserts one translation per language and flags it stale after an edit", async () => {
+    const recipe = await db.createRecipe(
+      { title: "Crêpes", language: "fr" },
+      { createdBy: "dev", source: "web" },
+    );
+    expect(recipe.language).toBe("fr");
+    expect(recipe.translations).toEqual({});
+
+    await db.setTranslation(recipe.id, "en", fields, recipe.updatedAt);
+    await db.setTranslation(recipe.id, "en", { ...fields, title: "Crepes" }, recipe.updatedAt);
+    const fresh = await db.getRecipe(recipe.id);
+    expect(Object.keys(fresh!.translations)).toEqual(["en"]);
+    expect(fresh!.translations.en).toEqual({ ...fields, title: "Crepes", stale: false });
+
+    await db.updateRecipe(recipe.id, { title: "Crêpes", language: "fr", notes: "Edited" });
+    expect((await db.getRecipe(recipe.id))!.translations.en!.stale).toBe(true);
+    const listed = (await db.listRecipes()).find((r) => r.id === recipe.id);
+    expect(listed!.translations.en!.stale).toBe(true);
+  });
+
+  it("deletes a recipe's translations with it", async () => {
+    const recipe = await db.createRecipe(
+      { title: "Soupe", language: "fr" },
+      { createdBy: "dev", source: "web" },
+    );
+    await db.setTranslation(recipe.id, "en", fields, recipe.updatedAt);
+    expect(await db.deleteRecipe(recipe.id)).toBe(true);
+    const left = await client.execute({
+      sql: "SELECT COUNT(*) AS n FROM recipe_translations WHERE recipe_id = ?",
+      args: [recipe.id],
+    });
+    expect(Number(left.rows[0].n)).toBe(0);
+  });
+});

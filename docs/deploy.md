@@ -208,6 +208,7 @@ dropped, not created.
 - [ ] Install the PWA on each phone (Share → Add to Home Screen)
 - [ ] New Recipe → paste recipe text → Extract prefills the form (proves ANTHROPIC_API_KEY)
 - [ ] New Recipe → paste a recipe-site URL → Extract prefills (or picker for several); a Claude share link either extracts or shows the copy-paste guidance
+- [ ] Save a recipe in French, switch the app to English → it reads translated (proves translation)
 
 ## Notes
 

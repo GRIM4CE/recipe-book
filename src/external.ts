@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import type { Db } from "./db.js";
-import type { Recipe } from "./types.js";
+import { LANGUAGES, type Language, type Recipe } from "./types.js";
 import type { Presigner } from "./uploads.js";
 
 // Import surface for the trusted automation that pushes recipes. A single
@@ -44,6 +44,10 @@ export function createExternalRouter(opts: {
         return;
       }
     }
+    if (b.language !== undefined && !LANGUAGES.includes(b.language as Language)) {
+      res.status(400).json({ error: "language must be en or fr" });
+      return;
+    }
     // Same unique-title rule the UI enforces: an importer that runs twice gets
     // told so rather than quietly making a second copy.
     if ((await opts.db.findRecipeIdByTitle(b.title.trim())) != null) {
@@ -67,6 +71,7 @@ export function createExternalRouter(opts: {
         instructions: ((b.instructions as string[] | undefined) ?? []).filter((s) =>
           s.trim(),
         ),
+        language: (b.language as Language | undefined) ?? "en",
         categoryId,
         photoKey: typeof b.photoKey === "string" ? b.photoKey : null,
       },
