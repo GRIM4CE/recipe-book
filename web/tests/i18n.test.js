@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { STRINGS, detectLanguage, localizeRecipe, translate } from '../src/i18n.js';
+import {
+  STRINGS,
+  detectLanguage,
+  localizeRecipe,
+  recipeLanguage,
+  translate,
+} from '../src/i18n.js';
 
 describe('detectLanguage', () => {
   it('prefers a valid stored choice over the browser language', () => {
@@ -136,5 +142,26 @@ describe('localizeRecipe', () => {
     expect(r.original).toBe(french);
     expect(r.original.title).toBe('Gratin dauphinois');
     expect(french).toEqual(snapshot);
+  });
+});
+
+describe('recipeLanguage', () => {
+  const french = { language: 'fr', translations: { en: {} } };
+  const bare = { language: 'fr', translations: {} };
+
+  it('uses the default language when the recipe is in it or has a translation', () => {
+    expect(recipeLanguage(french, 'en')).toBe('en');
+    expect(recipeLanguage(french, 'fr')).toBe('fr');
+    expect(recipeLanguage({ language: 'en' }, 'en')).toBe('en');
+  });
+
+  it('falls back to the source language when there is no translation', () => {
+    expect(recipeLanguage(bare, 'en')).toBe('fr');
+    expect(recipeLanguage({ language: 'fr' }, 'en')).toBe('fr');
+  });
+
+  it('lets the reader’s pick for this recipe win', () => {
+    expect(recipeLanguage(french, 'en', 'fr')).toBe('fr');
+    expect(recipeLanguage(bare, 'fr', 'en')).toBe('en');
   });
 });

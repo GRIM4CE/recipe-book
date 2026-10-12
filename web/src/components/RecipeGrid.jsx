@@ -24,7 +24,16 @@ function useTwoColumns() {
 
 // Search, filters and scroll position live in App so they survive the trip
 // into a recipe and back: the list you return to is the list you left.
-export default function RecipeGrid({ recipes, categories, filters, onFilters, scrollRef }) {
+export default function RecipeGrid({
+  recipes,
+  categories,
+  filters,
+  onFilters,
+  scrollRef,
+  canEdit,
+  inFlight,
+  onViewLanguage,
+}) {
   const { t } = useLanguage();
   const { query, categoryId, tag, ingredient, filtersOpen } = filters;
   const set = (patch) => onFilters({ ...filters, ...patch });
@@ -176,7 +185,13 @@ export default function RecipeGrid({ recipes, categories, filters, onFilters, sc
               // many ways.
               <div className="stack" key={i} style={{ '--stack-count': column.length }}>
                 {column.map((r) => (
-                  <RecipeCard key={r.id} recipe={r} />
+                  <RecipeCard
+                    key={r.id}
+                    recipe={r}
+                    canEdit={canEdit}
+                    busy={inFlight.has(r.id)}
+                    onViewLanguage={onViewLanguage}
+                  />
                 ))}
               </div>
             ))}

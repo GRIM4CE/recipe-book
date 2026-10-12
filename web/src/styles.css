@@ -160,39 +160,72 @@ body {
   flex-direction: column;
 }
 
-.card {
+/* The wrapper is the slat: it holds the link and the recipe's language switch
+   side by side, since a button can't sit inside the link. */
+.card-wrap {
   flex: none;
+  display: flex;
+  flex-direction: column;
   height: max(var(--card-slim), var(--card-slice));
   position: relative;
-  /* The bottom padding clears the slat that overlaps this one, so the last line
-     of the recipe never ends up underneath it. */
-  padding: 20px 22px calc(var(--card-lap) + 10px);
   background: var(--card-color);
   border-radius: 26px 26px 0 0;
   overflow: hidden;
   color: var(--card-ink);
-  text-decoration: none;
   transition: transform 120ms ease;
+}
+
+.card {
+  flex: 1;
+  min-height: 0;
+  /* The bottom padding clears the slat that overlaps this one, so the last line
+     of the recipe never ends up underneath it. */
+  padding: 20px 22px calc(var(--card-lap) + 10px);
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The slat clips its link, so the focus ring is drawn inside it. */
+.card:focus-visible {
+  outline-offset: -4px;
 }
 
 /* Later cards paint over earlier ones, so pulling each one up hides the
    bottom corners of its neighbour and reads as a stack. */
-.card + .card {
+.card-wrap + .card-wrap {
   margin-top: calc(var(--card-lap) * -1);
   box-shadow: 0 -3px 12px rgb(0 0 0 / 0.16);
 }
 
-.card:hover {
+.card-wrap:hover {
   transform: translateY(-4px);
 }
 
 /* Nothing overlaps the last slat, so it shows its recipe in full — and it runs
    to the bottom of the screen whether that recipe fills it or not, which is why
    only its top corners are rounded. */
-.card:last-child {
+.card-wrap:last-child {
   height: auto;
   min-height: max(var(--card-slim), var(--card-slice));
+}
+
+.card-wrap:last-child .card {
   padding-bottom: calc(var(--card-lap) + 10px + env(safe-area-inset-bottom));
+}
+
+/* Top right, in the slat's top padding so it stays clear of the title and in
+   the band that's still showing when the next slat overlaps this one. */
+.card-wrap .lang-switch {
+  position: absolute;
+  top: 3px;
+  right: 10px;
+  gap: 3px;
+}
+
+.card-wrap .lang-switch .btn {
+  padding: 1px 7px;
+  font-size: 0.7rem;
+  line-height: 1.2;
 }
 
 .card-title {
@@ -262,6 +295,7 @@ body {
 /* Everything on the card is tinted from the card's own ink, so a pale category
    color gets dark chrome and a deep one gets light chrome. */
 .detail .btn.ghost,
+.card-wrap .btn.ghost,
 .detail .scale-btn {
   color: inherit;
   border-color: color-mix(in srgb, currentColor 45%, transparent);
@@ -509,7 +543,8 @@ body {
   color: var(--bg);
 }
 
-.detail .lang-switch .btn[aria-pressed='true'] {
+.detail .lang-switch .btn[aria-pressed='true'],
+.card-wrap .lang-switch .btn[aria-pressed='true'] {
   background: var(--card-ink);
   border-color: var(--card-ink);
   color: var(--card-color);

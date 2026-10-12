@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import { currentUser, devMode, hasDevicePasskey, logout, registerPasskey } from './auth.js';
-import { localizeRecipe } from './i18n.js';
+import { localizeRecipe, recipeLanguage } from './i18n.js';
 import Categories from './components/Categories.jsx';
 import LanguageSwitch from './components/LanguageSwitch.jsx';
 import Login from './components/Login.jsx';
@@ -44,6 +44,12 @@ export default function App() {
     filtersOpen: false,
   });
   const listScroll = useRef(0);
+  // Per-recipe language picks, kept here so a choice made on a card survives
+  // opening the recipe and coming back. Not saved: a reload starts from the
+  // reader's default again.
+  const [overrides, setOverrides] = useState({});
+  // Recipes being translated right now, by id.
+  const [inFlight, setInFlight] = useState(() => new Set());
 
   const reload = useCallback(() => {
     return Promise.all([api.listRecipes(), api.listCategories(), api.listTags()])
@@ -75,16 +81,11 @@ export default function App() {
     }
   }
 
-  // Translating takes a few seconds, so saving doesn't wait for it: the
-  // translated text shows up on the next reload. Failures are fine (translation
-  // may not be configured); the Translate button on the recipe retries.
+  // Nothing is translated here: a translation is made when someone picks that
+  // language on the recipe (see onViewLanguage).
   function onSaved(recipe) {
     reload();
     window.location.hash = `#/recipes/${recipe.id}`;
-    api
-      .translateRecipe(recipe.id)
-      .then(() => reload())
-      .catch(() => {});
   }
 
   async function onTranslateRecipe(recipe) {
@@ -93,6 +94,31 @@ export default function App() {
       await reload();
     } catch (err) {
       window.alert(err.message);
+    }
+  }
+
+  // A language the recipe already has just switches the view. One it doesn't
+  // is translated first (signed in only; the switch greys it out otherwise).
+  async function onViewLanguage(recipe, language) {
+    const setView = () => setOverrides((o) => ({ ...o, [recipe.id]: language }));
+    if (language === recipe.language || recipe.translations?.[language]) {
+      setView();
+      return;
+    }
+    if (!user) return;
+    setInFlight((s) => new Set(s).add(recipe.id));
+    try {
+      await api.translateRecipe(recipe.id);
+      await reload();
+      setView();
+    } catch (err) {
+      window.alert(err.message);
+    } finally {
+      setInFlight((s) => {
+        const next = new Set(s);
+        next.delete(recipe.id);
+        return next;
+      });
     }
   }
 
@@ -131,9 +157,14 @@ export default function App() {
   const showSignIn =
     devMode || hasDevicePasskey() || window.matchMedia('(display-mode: standalone)').matches;
 
-  // What readers see: each recipe in the current language. The form edits the
-  // untouched `recipes` instead, so a translation is never saved as the source.
-  const shown = recipes?.map((r) => localizeRecipe(r, lang));
+  // What readers see: each recipe in its own language, which is the reader's
+  // default (the header switch) unless they picked another for that recipe. The
+  // form edits the untouched `recipes` instead, so a translation is never saved
+  // as the source.
+  const shown = recipes?.map((r) => {
+    const viewLanguage = recipeLanguage(r, lang, overrides[r.id]);
+    return { ...localizeRecipe(r, viewLanguage), viewLanguage };
+  });
 
   const tagSuggestions = [...new Set((shown ?? []).flatMap((r) => r.tags ?? []))].sort(
     (a, b) => a.localeCompare(b),
@@ -196,8 +227,10 @@ export default function App() {
         recipe={recipe}
         recipes={shown}
         canEdit={Boolean(user)}
+        busy={inFlight.has(recipe.id)}
         onDuplicate={onDuplicateRecipe}
         onTranslate={onTranslateRecipe}
+        onViewLanguage={onViewLanguage}
       />
     ) : (
       <p className="notice">{t('recipeMissing')}</p>
@@ -210,6 +243,9 @@ export default function App() {
         filters={filters}
         onFilters={setFilters}
         scrollRef={listScroll}
+        canEdit={Boolean(user)}
+        inFlight={inFlight}
+        onViewLanguage={onViewLanguage}
       />
     );
   }

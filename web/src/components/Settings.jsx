@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { useLanguage } from '../useLanguage.jsx';
+import LanguageSwitch from './LanguageSwitch.jsx';
 
 function Invite() {
   const { t } = useLanguage();
@@ -102,6 +103,10 @@ export default function Settings({ user, onSignOut }) {
       <div className="settings-section">
         <p className="settings-label">{t('signedInAs')}</p>
         <p className="settings-user">{user}</p>
+      </div>
+      <div className="settings-section">
+        <p className="settings-label">{t('language')}</p>
+        <LanguageSwitch />
       </div>
       {canInvite && <Invite />}
       <button className="btn danger" type="button" onClick={onSignOut}>
