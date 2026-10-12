@@ -490,6 +490,24 @@ body {
   margin-left: auto;
 }
 
+/* EN | FR: two ghost buttons, the chosen one filled like .chip.active. */
+.lang-switch {
+  display: flex;
+  gap: 4px;
+}
+
+.lang-switch .btn[aria-pressed='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+
+.detail .lang-switch .btn[aria-pressed='true'] {
+  background: var(--card-ink);
+  border-color: var(--card-ink);
+  color: var(--card-color);
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;

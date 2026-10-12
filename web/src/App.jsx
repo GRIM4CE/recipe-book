@@ -2,12 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import { currentUser, devMode, hasDevicePasskey, logout, registerPasskey } from './auth.js';
 import Categories from './components/Categories.jsx';
+import LanguageSwitch from './components/LanguageSwitch.jsx';
 import Login from './components/Login.jsx';
 import RecipeDetail from './components/RecipeDetail.jsx';
 import RecipeForm from './components/RecipeForm.jsx';
 import RecipeGrid from './components/RecipeGrid.jsx';
 import Settings from './components/Settings.jsx';
 import TagManager from './components/TagManager.jsx';
+import { useLanguage } from './useLanguage.jsx';
 
 // Hash routing keeps the SPA deployable without rewrite rules: the path after
 // '#' is the route, e.g. #/recipes/12.
@@ -23,6 +25,7 @@ export function useHashRoute() {
 }
 
 export default function App() {
+  const { t } = useLanguage();
   const route = useHashRoute();
   const [user, setUser] = useState(currentUser);
   const [offerPasskey, setOfferPasskey] = useState(false);
@@ -121,11 +124,11 @@ export default function App() {
 
   let page;
   if (error) {
-    page = <p className="notice">Couldn’t load recipes: {error}</p>;
+    page = <p className="notice">{t('loadError', { error })}</p>;
   } else if (route === '/login') {
     page = <Login onLogin={setUser} />;
   } else if (recipes === null) {
-    page = <p className="notice">Loading…</p>;
+    page = <p className="notice">{t('loading')}</p>;
   } else if (route === '/new') {
     page = user ? (
       <RecipeForm categories={categories} tagSuggestions={tagSuggestions} onSaved={onSaved} />
@@ -145,7 +148,7 @@ export default function App() {
         onDelete={onDeleteRecipe}
       />
     ) : (
-      <p className="notice">That recipe doesn’t exist (anymore).</p>
+      <p className="notice">{t('recipeMissing')}</p>
     );
   } else if (route === '/categories') {
     page = user ? (
@@ -175,7 +178,7 @@ export default function App() {
         onDuplicate={onDuplicateRecipe}
       />
     ) : (
-      <p className="notice">That recipe doesn’t exist (anymore).</p>
+      <p className="notice">{t('recipeMissing')}</p>
     );
   } else {
     page = (
@@ -197,21 +200,22 @@ export default function App() {
     <div className={bare ? 'app bare' : 'app'}>
       {!bare && (
         <header className="header">
-          <a href="#/" className="wordmark">Recipe Book</a>
+          <a href="#/" className="wordmark">{t('appName')}</a>
           <nav className="nav">
+            <LanguageSwitch />
             {user ? (
               <>
-                <a className="btn primary small" href="#/new">+ Recipe</a>
-                <a className="btn ghost small" href="#/categories">Categories</a>
-                <a className="btn ghost small" href="#/tags">Tags</a>
-                <a className="icon-btn" href="#/settings" aria-label="Settings" title="Settings">
+                <a className="btn primary small" href="#/new">{t('newRecipe')}</a>
+                <a className="btn ghost small" href="#/categories">{t('categories')}</a>
+                <a className="btn ghost small" href="#/tags">{t('tags')}</a>
+                <a className="icon-btn" href="#/settings" aria-label={t('settings')} title={t('settings')}>
                   <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
                     <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
                   </svg>
                 </a>
               </>
             ) : showSignIn ? (
-              <a className="btn ghost small" href="#/login">Sign in</a>
+              <a className="btn ghost small" href="#/login">{t('signIn')}</a>
             ) : null}
           </nav>
         </header>
@@ -219,12 +223,12 @@ export default function App() {
       <main>
         {offerPasskey && (
           <p className="notice">
-            Add a passkey to sign in with just Face ID / fingerprint next time.{' '}
+            {t('passkeyOffer')}{' '}
             <button className="btn primary small" type="button" onClick={addPasskey}>
-              Add passkey
+              {t('addPasskey')}
             </button>{' '}
             <button className="btn ghost small" type="button" onClick={() => setOfferPasskey(false)}>
-              Not now
+              {t('notNow')}
             </button>
           </p>
         )}

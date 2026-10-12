@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { inkFor } from '../ink.js';
 import { scaleIngredient, scaleServings } from '../scale.js';
+import { useLanguage } from '../useLanguage.jsx';
+import LanguageSwitch from './LanguageSwitch.jsx';
 import RichText from './RichText.jsx';
 
 const SCALES = [
@@ -14,11 +16,12 @@ const SCALES = [
 ];
 
 export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicate }) {
+  const { lang, t } = useLanguage();
   const [factor, setFactor] = useState(1);
   const [shareNote, setShareNote] = useState('');
   const [copying, setCopying] = useState(false);
   const color = recipe.category?.color ?? '#8b8378';
-  const added = new Date(recipe.createdAt).toLocaleDateString(undefined, {
+  const added = new Date(recipe.createdAt).toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -27,11 +30,11 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
   // Give each recipe its own tab/history title for bookmarks and shares.
   useEffect(() => {
     const previous = document.title;
-    document.title = `${recipe.title} · Recipe Book`;
+    document.title = `${recipe.title} · ${t('appName')}`;
     return () => {
       document.title = previous;
     };
-  }, [recipe.title]);
+  }, [recipe.title, t]);
 
   async function share() {
     const url = window.location.href;
@@ -42,10 +45,10 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
         return;
       }
       await navigator.clipboard.writeText(url);
-      setShareNote('Link copied');
+      setShareNote(t('linkCopied'));
     } catch (err) {
       if (err?.name === 'AbortError') return; // user dismissed the share sheet
-      setShareNote('Couldn’t share');
+      setShareNote(t('shareFailed'));
     }
     setTimeout(() => setShareNote(''), 2000);
   }
@@ -55,11 +58,12 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
   return (
     <article className="detail" style={{ '--card-color': color, '--card-ink': inkFor(color) }}>
       <div className="detail-topbar">
-        <a className="btn ghost small back" href="#/">‹ Back</a>
+        <a className="btn ghost small back" href="#/">‹ {t('back')}</a>
         <div className="detail-top-actions">
           {shareNote && <span className="share-note">{shareNote}</span>}
+          <LanguageSwitch />
           <button className="btn ghost small" type="button" onClick={share}>
-            Share
+            {t('share')}
           </button>
           {canEdit && (
             <button
@@ -72,12 +76,12 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
                 setCopying(false);
               }}
             >
-              {copying ? 'Duplicating…' : 'Duplicate'}
+              {copying ? t('duplicating') : t('duplicate')}
             </button>
           )}
           {canEdit && (
             <a className="btn ghost small" href={`#/recipes/${recipe.id}/edit`}>
-              Edit
+              {t('edit')}
             </a>
           )}
         </div>
@@ -90,9 +94,9 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
         )}
         {recipe.tags?.length > 0 && (
           <div className="detail-tags">
-            {recipe.tags.map((t) => (
-              <span key={t} className="tag">
-                #{t}
+            {recipe.tags.map((tag) => (
+              <span key={tag} className="tag">
+                #{tag}
               </span>
             ))}
           </div>
@@ -103,8 +107,8 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
       {recipe.ingredients.length > 0 && (
         <section className="detail-section">
           <div className="ingredients-header">
-            <h3>Ingredients</h3>
-            <div className="scale-picker" role="group" aria-label="Scale recipe">
+            <h3>{t('ingredients')}</h3>
+            <div className="scale-picker" role="group" aria-label={t('scaleRecipe')}>
               {SCALES.map((s) => (
                 <button
                   key={s.label}
@@ -119,7 +123,7 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
           </div>
           {recipe.servings && (
             <p className="servings">
-              Servings: {scaleServings(recipe.servings, factor)}
+              {t('servingsLabel')} {scaleServings(recipe.servings, factor)}
             </p>
           )}
           <ul className="ingredients">
@@ -132,7 +136,7 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
 
       {recipe.instructions.length > 0 && (
         <section className="detail-section">
-          <h3>Instructions</h3>
+          <h3>{t('instructions')}</h3>
           <ol className="instructions">
             {recipe.instructions.map((step, i) => (
               <li key={i}>
@@ -145,7 +149,7 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
 
       {recipe.notes && (
         <section className="detail-section">
-          <h3>Notes</h3>
+          <h3>{t('notes')}</h3>
           <p className="notes">
             <RichText text={recipe.notes} recipes={recipes} excludeId={recipe.id} />
           </p>
@@ -157,7 +161,7 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
       )}
 
       <p className="detail-meta">
-        Added by {recipe.createdBy} · {added}
+        {t('addedBy', { name: recipe.createdBy, date: added })}
       </p>
     </article>
   );
