@@ -114,10 +114,21 @@ Resources:
       ExplicitAuthFlows:
         - ALLOW_USER_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
-      # A device stays signed in for a year; renewal is one email code.
-      RefreshTokenValidity: 365
+      # An unknown sign-in name gets the same response as a real one, so the
+      # public login page can't be used to find out who has an account.
+      PreventUserExistenceErrors: ENABLED
+      # The API checks a token's signature and expiry, never revocation, so a
+      # removed or signed-out person keeps writing until their access token
+      # runs out. Short tokens keep that window small; the app refreshes them
+      # quietly.
+      AccessTokenValidity: 15
+      # A device stays signed in for three months; renewal is one email code.
+      RefreshTokenValidity: 90
       TokenValidityUnits:
+        AccessToken: minutes
         RefreshToken: days
+      # On by default; stated because sign-out relies on RevokeToken.
+      EnableTokenRevocation: true
 
   PhotosBucket:
     Type: AWS::S3::Bucket
