@@ -34,7 +34,7 @@
     "esbuild": "^0.28.2",
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",
-    "typescript": "^5.9.0",
+    "typescript": "^7.0.2",
     "vitest": "^3.2.0"
   }
 }
