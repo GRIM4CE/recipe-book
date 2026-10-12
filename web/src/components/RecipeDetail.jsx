@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { inkFor } from '../ink.js';
 import { scaleIngredient, scaleServings } from '../scale.js';
 import { useLanguage } from '../useLanguage.jsx';
-import LanguageSwitch from './LanguageSwitch.jsx';
+import RecipeLanguageSwitch from './RecipeLanguageSwitch.jsx';
 import RichText from './RichText.jsx';
 
 const SCALES = [
@@ -15,19 +15,26 @@ const SCALES = [
   { label: '8×', factor: 8 },
 ];
 
-export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicate, onTranslate }) {
+export default function RecipeDetail({
+  recipe,
+  recipes = [],
+  canEdit,
+  busy,
+  onDuplicate,
+  onTranslate,
+  onViewLanguage,
+}) {
   const { lang, t } = useLanguage();
   const [factor, setFactor] = useState(1);
   const [shareNote, setShareNote] = useState('');
   const [copying, setCopying] = useState(false);
   const [translating, setTranslating] = useState(false);
   const color = recipe.category?.color ?? '#8b8378';
-  const { shown, stale, pending } = recipe.translation;
+  const { shown, stale } = recipe.translation;
   const translationNote = [
     shown === 'translated' &&
       t('translatedFrom', { language: t(`languageFrom_${recipe.language}`) }),
     stale && t('translationStale'),
-    pending && t('translationPending'),
   ]
     .filter(Boolean)
     .join(' · ');
@@ -71,7 +78,12 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
         <a className="btn ghost small back" href="#/">‹ {t('back')}</a>
         <div className="detail-top-actions">
           {shareNote && <span className="share-note">{shareNote}</span>}
-          <LanguageSwitch />
+          <RecipeLanguageSwitch
+            recipe={recipe}
+            canEdit={canEdit}
+            busy={busy}
+            onSelect={onViewLanguage}
+          />
           <button className="btn ghost small" type="button" onClick={share}>
             {t('share')}
           </button>
@@ -115,7 +127,7 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
         {translationNote && (
           <p className="detail-translation">
             {translationNote}
-            {canEdit && (pending || stale) && (
+            {canEdit && stale && (
               <>
                 {' '}
                 <button

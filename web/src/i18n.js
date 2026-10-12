@@ -284,3 +284,12 @@ export function localizeRecipe(recipe, lang) {
     },
   };
 }
+
+// The language a recipe is shown in: the reader's own pick for this recipe if
+// they made one, else their default when the recipe has it, else its source.
+export function recipeLanguage(recipe, preferred, override) {
+  if (override) return override;
+  return recipe.language === preferred || recipe.translations?.[preferred]
+    ? preferred
+    : recipe.language;
+}
