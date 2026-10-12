@@ -5,19 +5,18 @@ import LanguageSwitch from './LanguageSwitch.jsx';
 
 function Invite() {
   const { t } = useLanguage();
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [invited, setInvited] = useState(null);
+  const [note, setNote] = useState('');
 
   async function submit(e) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const created = await api.inviteUser({ username: username.trim(), email: email.trim() });
-      setInvited(created.username);
+      setInvited(await api.inviteUser({ email: email.trim() }));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -26,9 +25,27 @@ function Invite() {
   }
 
   function reset() {
-    setUsername('');
     setEmail('');
     setInvited(null);
+  }
+
+  const message = invited
+    ? t('inviteMessage', { url: `${window.location.origin}/#/login`, email: invited.email })
+    : '';
+
+  async function send() {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: t('appName'), text: message });
+        return;
+      }
+      await navigator.clipboard.writeText(message);
+      setNote(t('inviteCopied'));
+    } catch (err) {
+      if (err?.name === 'AbortError') return; // user dismissed the share sheet
+      setNote(t('shareFailed'));
+    }
+    setTimeout(() => setNote(''), 2000);
   }
 
   return (
@@ -36,13 +53,14 @@ function Invite() {
       <p className="settings-label">{t('inviteTitle')}</p>
       {invited ? (
         <>
-          <p>{t('invited', { name: invited })}</p>
-          <ol className="invite-steps">
-            <li>{t('inviteStep1', { url: `${window.location.origin}/#/login` })}</li>
-            <li>{t('inviteStep2', { name: invited })}</li>
-            <li>{t('inviteStep3')}</li>
-            <li>{t('inviteStep4')}</li>
-          </ol>
+          <p>{t('invited', { email: invited.email })}</p>
+          <pre className="invite-message">{message}</pre>
+          <div className="invite-actions">
+            <button className="btn primary" type="button" onClick={send}>
+              {t('sendInvite')}
+            </button>
+            {note && <span className="share-note">{note}</span>}
+          </div>
           <button className="btn ghost" type="button" onClick={reset}>
             {t('inviteAnother')}
           </button>
@@ -50,17 +68,6 @@ function Invite() {
       ) : (
         <form className="form" onSubmit={submit}>
           <p className="hint">{t('inviteHint')}</p>
-          <label>
-            {t('username')}
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoCapitalize="none"
-              autoComplete="off"
-              spellCheck={false}
-              required
-            />
-          </label>
           <label>
             {t('email')}
             <input

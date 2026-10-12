@@ -743,12 +743,21 @@ body {
   font-size: 1.1rem;
 }
 
-.invite-steps {
-  margin: 12px 0 18px;
-  padding-left: 22px;
+.invite-message {
+  font: inherit;
+  white-space: pre-wrap;
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  user-select: text;
+}
+
+.invite-actions {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 /* Categories */
