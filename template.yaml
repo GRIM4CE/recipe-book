@@ -70,7 +70,7 @@ Resources:
       UserPoolTier: ESSENTIALS
       WebAuthnRelyingPartyID: !Ref WebAuthnRpId
       WebAuthnUserVerification: required
-      # The two accounts are created by the admin CLI; nobody can sign up.
+      # Accounts are created by the admin CLI (scripts/add-user.sh); nobody can sign up.
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
       # No self-service password reset: nothing can convert email access
