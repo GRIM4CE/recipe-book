@@ -15,12 +15,22 @@ const SCALES = [
   { label: '8×', factor: 8 },
 ];
 
-export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicate }) {
+export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicate, onTranslate }) {
   const { lang, t } = useLanguage();
   const [factor, setFactor] = useState(1);
   const [shareNote, setShareNote] = useState('');
   const [copying, setCopying] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const color = recipe.category?.color ?? '#8b8378';
+  const { shown, stale, pending } = recipe.translation;
+  const translationNote = [
+    shown === 'translated' &&
+      t('translatedFrom', { language: t(`languageFrom_${recipe.language}`) }),
+    stale && t('translationStale'),
+    pending && t('translationPending'),
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const added = new Date(recipe.createdAt).toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-US', {
     year: 'numeric',
     month: 'long',
@@ -102,6 +112,28 @@ export default function RecipeDetail({ recipe, recipes = [], canEdit, onDuplicat
           </div>
         )}
         {recipe.summary && <p className="detail-summary">{recipe.summary}</p>}
+        {translationNote && (
+          <p className="detail-translation">
+            {translationNote}
+            {canEdit && (pending || stale) && (
+              <>
+                {' '}
+                <button
+                  className="btn ghost small"
+                  type="button"
+                  disabled={translating}
+                  onClick={async () => {
+                    setTranslating(true);
+                    await onTranslate(recipe.original);
+                    setTranslating(false);
+                  }}
+                >
+                  {translating ? t('translating') : t('translate')}
+                </button>
+              </>
+            )}
+          </p>
+        )}
       </header>
 
       {recipe.ingredients.length > 0 && (

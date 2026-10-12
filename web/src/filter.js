@@ -85,8 +85,14 @@ export function filterRecipes(
     if (ing && !(r.ingredients ?? []).some((line) => line.toLowerCase().includes(ing)))
       return false;
     if (queryWords.length === 0) return true;
+    // Every language version counts, so an English search finds a French
+    // recipe through its English translation and vice versa. `original` is the
+    // source text when the list has been localized (see localizeRecipe).
+    const versions = [r, r.original, ...Object.values(r.translations ?? {})].filter(Boolean);
     const contentWords = tokenize(
-      [r.title, r.summary, ...(r.ingredients ?? []), ...(r.instructions ?? [])].join(' '),
+      versions
+        .flatMap((v) => [v.title, v.summary, ...(v.ingredients ?? []), ...(v.instructions ?? [])])
+        .join(' '),
     );
     return matchesQuery(contentWords, queryWords);
   });

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 import { blobToBase64, downscaleToJpeg } from '../image.js';
+import { LANGUAGES, LANGUAGE_NAMES } from '../i18n.js';
 import { useLanguage } from '../useLanguage.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
 const lines = (text) =>
@@ -11,10 +12,11 @@ const lines = (text) =>
 
 // One line per ingredient/step: far friendlier on a phone than dynamic rows.
 export default function RecipeForm({ recipe, categories, tagSuggestions = [], onSaved, onDelete }) {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const [title, setTitle] = useState(recipe?.title ?? '');
   const [summary, setSummary] = useState(recipe?.summary ?? '');
   const [servings, setServings] = useState(recipe?.servings ?? '');
+  const [language, setLanguage] = useState(recipe?.language ?? lang);
   const [categoryId, setCategoryId] = useState(recipe?.category?.id ?? '');
   const [tags, setTags] = useState(recipe?.tags ?? []);
   const [tagInput, setTagInput] = useState('');
@@ -63,6 +65,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
     setTitle(r.title);
     setSummary(r.summary);
     setServings(r.servings ?? '');
+    if (LANGUAGES.includes(r.language)) setLanguage(r.language);
     setCategoryId(r.categoryId ?? '');
     setIngredients(r.ingredients.join('\n'));
     setInstructions(r.instructions.join('\n'));
@@ -145,6 +148,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
         title,
         summary,
         servings: servings.trim(),
+        language,
         categoryId: categoryId === '' ? null : Number(categoryId),
         tags: savedTags,
         ingredients: lines(ingredients),
@@ -268,6 +272,16 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
           onChange={(e) => setServings(e.target.value)}
           placeholder={t('servingsPlaceholder')}
         />
+      </label>
+      <label>
+        {t('language')}
+        <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+          {LANGUAGES.map((code) => (
+            <option key={code} value={code}>
+              {LANGUAGE_NAMES[code]}
+            </option>
+          ))}
+        </select>
       </label>
       <label>
         {t('category')}

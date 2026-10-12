@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import { currentUser, devMode, hasDevicePasskey, logout, registerPasskey } from './auth.js';
+import { localizeRecipe } from './i18n.js';
 import Categories from './components/Categories.jsx';
 import LanguageSwitch from './components/LanguageSwitch.jsx';
 import Login from './components/Login.jsx';
@@ -25,7 +26,7 @@ export function useHashRoute() {
 }
 
 export default function App() {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const route = useHashRoute();
   const [user, setUser] = useState(currentUser);
   const [offerPasskey, setOfferPasskey] = useState(false);
@@ -74,9 +75,25 @@ export default function App() {
     }
   }
 
+  // Translating takes a few seconds, so saving doesn't wait for it: the
+  // translated text shows up on the next reload. Failures are fine (translation
+  // may not be configured); the Translate button on the recipe retries.
   function onSaved(recipe) {
     reload();
     window.location.hash = `#/recipes/${recipe.id}`;
+    api
+      .translateRecipe(recipe.id)
+      .then(() => reload())
+      .catch(() => {});
+  }
+
+  async function onTranslateRecipe(recipe) {
+    try {
+      await api.translateRecipe(recipe.id);
+      await reload();
+    } catch (err) {
+      window.alert(err.message);
+    }
   }
 
   // Lands on the copy's edit form: duplicating is how you start a variation,
@@ -114,13 +131,17 @@ export default function App() {
   const showSignIn =
     devMode || hasDevicePasskey() || window.matchMedia('(display-mode: standalone)').matches;
 
-  const tagSuggestions = [...new Set((recipes ?? []).flatMap((r) => r.tags ?? []))].sort(
+  // What readers see: each recipe in the current language. The form edits the
+  // untouched `recipes` instead, so a translation is never saved as the source.
+  const shown = recipes?.map((r) => localizeRecipe(r, lang));
+
+  const tagSuggestions = [...new Set((shown ?? []).flatMap((r) => r.tags ?? []))].sort(
     (a, b) => a.localeCompare(b),
   );
 
   const detailMatch = route.match(/^\/recipes\/(\d+)$/);
   const editMatch = route.match(/^\/recipes\/(\d+)\/edit$/);
-  const findRecipe = (id) => recipes?.find((r) => r.id === Number(id));
+  const findRecipe = (id, list = recipes) => list?.find((r) => r.id === Number(id));
 
   let page;
   if (error) {
@@ -169,13 +190,14 @@ export default function App() {
       <Login onLogin={setUser} />
     );
   } else if (detailMatch) {
-    const recipe = findRecipe(detailMatch[1]);
+    const recipe = findRecipe(detailMatch[1], shown);
     page = recipe ? (
       <RecipeDetail
         recipe={recipe}
-        recipes={recipes}
+        recipes={shown}
         canEdit={Boolean(user)}
         onDuplicate={onDuplicateRecipe}
+        onTranslate={onTranslateRecipe}
       />
     ) : (
       <p className="notice">{t('recipeMissing')}</p>
@@ -183,7 +205,7 @@ export default function App() {
   } else {
     page = (
       <RecipeGrid
-        recipes={recipes}
+        recipes={shown}
         categories={categories}
         filters={filters}
         onFilters={setFilters}

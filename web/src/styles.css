@@ -431,6 +431,13 @@ body {
   border-radius: 16px;
 }
 
+/* Quiet note about which language version this is. */
+.detail-translation {
+  font-size: 0.85rem;
+  margin: 10px 0 0;
+  opacity: 0.75;
+}
+
 .detail-meta {
   font-size: 0.85rem;
   text-align: center;
