@@ -51,4 +51,6 @@ CREATE TABLE IF NOT EXISTS recipe_translations (
   created_at TEXT NOT NULL,
   PRIMARY KEY (recipe_id, language)
 );
+
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;
