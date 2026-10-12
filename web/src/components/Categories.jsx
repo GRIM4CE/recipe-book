@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 import { useLanguage } from '../useLanguage.jsx';
+import Icon from './Icon.jsx';
 
 const PALETTE = [
   '#E85D4C',
@@ -113,6 +114,12 @@ export default function Categories({ categories, onChanged }) {
 
   return (
     <div className="categories-page">
+      {/* Reached from the header's + menu and from Settings: back goes to
+          whichever it was. */}
+      <button className="btn outline back" type="button" onClick={() => window.history.back()}>
+        <Icon name="chevron-left" size={16} />
+        {t('back')}
+      </button>
       <h2>{t('categories')}</h2>
       <ul className="category-list">
         {categories.map((c) => (

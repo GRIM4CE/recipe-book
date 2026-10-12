@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { filterRecipes } from '../filter.js';
+import { useDismiss } from '../useDismiss.js';
 import { useLanguage } from '../useLanguage.jsx';
+import Icon from './Icon.jsx';
 import RecipeCard from './RecipeCard.jsx';
 
 // Past this the slats are all at their floor height and it's just scrolling;
@@ -30,15 +32,13 @@ export default function RecipeGrid({
   filters,
   onFilters,
   scrollRef,
-  canEdit,
-  inFlight,
-  onViewLanguage,
 }) {
   const { t } = useLanguage();
   const { query, categoryId, tag, ingredient, createdBy, filtersOpen } = filters;
   const set = (patch) => onFilters({ ...filters, ...patch });
   const stacksRef = useRef(null);
   const twoColumns = useTwoColumns();
+  const filtersRef = useDismiss(filtersOpen, () => set({ filtersOpen: false }));
   const tagNames = [...new Set(recipes.flatMap((r) => r.tags ?? []))].sort((a, b) =>
     a.localeCompare(b),
   );
@@ -51,8 +51,8 @@ export default function RecipeGrid({
     ? [visible.slice(0, Math.ceil(visible.length / 2)), visible.slice(Math.ceil(visible.length / 2))]
     : [visible];
 
-  // Tags + ingredient live inside the collapsed panel, so surface a count on
-  // the toggle to hint at active filters you can't currently see.
+  // Tags, ingredient and person live behind the funnel, so the funnel carries a
+  // count and each active one shows as a removable chip in the search field.
   const hiddenCount = (tag ? 1 : 0) + (ingredient.trim() ? 1 : 0) + (createdBy ? 1 : 0);
   const hasFilters =
     Boolean(query.trim()) ||
@@ -71,7 +71,7 @@ export default function RecipeGrid({
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [filtersOpen, visible.length === 0]);
+  }, [hiddenCount, visible.length === 0]);
 
   // Put the reader back where they were. The position is banked on the way out
   // (see the stack's onClickCapture) rather than on unmount, because following
@@ -91,20 +91,128 @@ export default function RecipeGrid({
     window.location.hash = `#/recipes/${pick.id}`;
   }
 
+  const activeChips = [
+    ingredient.trim() && { label: ingredient.trim(), clear: { ingredient: '' } },
+    tag && { label: `#${tag}`, clear: { tag: null } },
+    createdBy && { label: createdBy, clear: { createdBy: null } },
+  ].filter(Boolean);
+
   return (
     <div className="grid-page">
-      <input
-        className="search"
-        type="search"
-        placeholder={t('searchPlaceholder')}
-        value={query}
-        onChange={(e) => set({ query: e.target.value })}
-      />
-      <div className="chips" role="tablist">
+      <div className="search-wrap" ref={filtersRef}>
+        <div className="search-pill">
+          <Icon name="search" />
+          {activeChips.map((chip) => (
+            <span key={chip.label} className="search-chip">
+              {chip.label}
+              <button
+                type="button"
+                aria-label={t('removeFilter', { label: chip.label })}
+                onClick={() => set(chip.clear)}
+              >
+                <Icon name="x" size={12} />
+              </button>
+            </span>
+          ))}
+          <input
+            className="search"
+            type="search"
+            placeholder={hiddenCount > 0 ? t('searchWithin') : t('searchPlaceholder')}
+            aria-label={t('searchPlaceholder')}
+            value={query}
+            onChange={(e) => set({ query: e.target.value })}
+            onFocus={() => filtersOpen && set({ filtersOpen: false })}
+          />
+          <button
+            type="button"
+            className={hiddenCount > 0 ? 'funnel active' : 'funnel'}
+            aria-label={t('filters')}
+            aria-haspopup="dialog"
+            aria-expanded={filtersOpen}
+            onClick={() => set({ filtersOpen: !filtersOpen })}
+          >
+            <Icon name="funnel" size={16} />
+            {hiddenCount > 0 && <span className="funnel-count">{hiddenCount}</span>}
+          </button>
+        </div>
+
+        {filtersOpen && (
+          <div className="filter-popover" role="dialog" aria-label={t('filters')}>
+            <label className="field">
+              {t('ingredient')}
+              <input
+                type="text"
+                value={ingredient}
+                onChange={(e) => set({ ingredient: e.target.value })}
+                placeholder={t('ingredientPlaceholder')}
+              />
+            </label>
+            {tagNames.length > 0 && (
+              <div className="filter-group">
+                <span className="eyebrow">{t('tags')}</span>
+                <div className="chip-wrap">
+                  {tagNames.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      className={tag === name ? 'chip small active' : 'chip small'}
+                      style={{ '--chip-color': '#a89e90' }}
+                      aria-pressed={tag === name}
+                      onClick={() => set({ tag: tag === name ? null : name })}
+                    >
+                      #{name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {people.length >= 2 && (
+              <div className="filter-group">
+                <span className="eyebrow">{t('byPerson')}</span>
+                <div className="chip-wrap">
+                  {people.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      className={createdBy === name ? 'chip small active' : 'chip small'}
+                      style={{ '--chip-color': '#a89e90' }}
+                      aria-pressed={createdBy === name}
+                      onClick={() => set({ createdBy: createdBy === name ? null : name })}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="filter-actions">
+              <button
+                type="button"
+                className="btn primary"
+                onClick={findSomethingGood}
+                disabled={matched.length === 0}
+              >
+                {t('findGood')}
+              </button>
+              <button type="button" className="btn quiet" onClick={() => set({ filtersOpen: false })}>
+                {t('done')}
+              </button>
+              {hasFilters && (
+                <button type="button" className="btn quiet small clear-all" onClick={clearFilters}>
+                  {t('clearAll')}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="chips" role="group" aria-label={t('category')}>
         <button
           type="button"
           className={categoryId === null ? 'chip active' : 'chip'}
           style={{ '--chip-color': '#8b8378' }}
+          aria-pressed={categoryId === null}
           onClick={() => set({ categoryId: null })}
         >
           {t('all')}
@@ -115,87 +223,25 @@ export default function RecipeGrid({
             type="button"
             className={categoryId === c.id ? 'chip active' : 'chip'}
             style={{ '--chip-color': c.color }}
+            aria-pressed={categoryId === c.id}
             onClick={() => set({ categoryId: categoryId === c.id ? null : c.id })}
           >
             {c.name}
           </button>
         ))}
       </div>
-
-      <div className="filter-bar">
-        <button
-          type="button"
-          className="btn ghost small"
-          aria-expanded={filtersOpen}
-          onClick={() => set({ filtersOpen: !filtersOpen })}
-        >
-          {t('filters')}
-          {hiddenCount > 0 ? ` (${hiddenCount})` : ''} {filtersOpen ? '▲' : '▼'}
-        </button>
-        {hasFilters && (
-          <button type="button" className="btn ghost small" onClick={clearFilters}>
-            {t('clear')}
-          </button>
-        )}
-      </div>
-
-      {filtersOpen && (
-        <div className="filter-panel">
-          <label className="filter-ingredient">
-            {t('ingredient')}
-            <input
-              type="text"
-              value={ingredient}
-              onChange={(e) => set({ ingredient: e.target.value })}
-              placeholder={t('ingredientPlaceholder')}
-            />
-          </label>
-          {tagNames.length > 0 && (
-            <div className="chips" role="tablist">
-              {tagNames.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  className={tag === name ? 'chip active' : 'chip'}
-                  style={{ '--chip-color': '#8b8378' }}
-                  onClick={() => set({ tag: tag === name ? null : name })}
-                >
-                  #{name}
-                </button>
-              ))}
-            </div>
-          )}
-          {people.length >= 2 && (
-            <div className="filter-people">
-              <span className="field-title">{t('byPerson')}</span>
-              <div className="chips" role="tablist">
-                {people.map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    className={createdBy === name ? 'chip active' : 'chip'}
-                    style={{ '--chip-color': '#8b8378' }}
-                    onClick={() => set({ createdBy: createdBy === name ? null : name })}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          <button
-            type="button"
-            className="btn primary find-good"
-            onClick={findSomethingGood}
-            disabled={matched.length === 0}
-          >
-            {t('findGood')}
-          </button>
-        </div>
-      )}
+      <p className="match-count">{t('matchCount', { shown: matched.length, total: recipes.length })}</p>
 
       {visible.length === 0 ? (
-        <p className="notice">{t('noMatch')}</p>
+        <div className="empty">
+          <p className="empty-title">{t('noMatch')}</p>
+          <p>{t('noMatchHint')}</p>
+          {hasFilters && (
+            <button type="button" className="btn outline" onClick={clearFilters}>
+              {t('clearFilters')}
+            </button>
+          )}
+        </div>
       ) : (
         <>
           <div
@@ -210,13 +256,7 @@ export default function RecipeGrid({
               // many ways.
               <div className="stack" key={i} style={{ '--stack-count': column.length }}>
                 {column.map((r) => (
-                  <RecipeCard
-                    key={r.id}
-                    recipe={r}
-                    canEdit={canEdit}
-                    busy={inFlight.has(r.id)}
-                    onViewLanguage={onViewLanguage}
-                  />
+                  <RecipeCard key={r.id} recipe={r} />
                 ))}
               </div>
             ))}

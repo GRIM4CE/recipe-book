@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 import { useLanguage } from '../useLanguage.jsx';
+import Icon from './Icon.jsx';
 
 function Row({ tag, onChanged }) {
   const { t } = useLanguage();
@@ -73,6 +74,12 @@ export default function TagManager({ tags, onChanged }) {
   const { t } = useLanguage();
   return (
     <div className="tags-page">
+      {/* Reached from the header's + menu and from Settings: back goes to
+          whichever it was. */}
+      <button className="btn outline back" type="button" onClick={() => window.history.back()}>
+        <Icon name="chevron-left" size={16} />
+        {t('back')}
+      </button>
       <h2>{t('tags')}</h2>
       {tags.length === 0 ? (
         <p className="notice">{t('noTags')}</p>

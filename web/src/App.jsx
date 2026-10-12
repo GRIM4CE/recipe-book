@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import { currentUser, devMode, hasDevicePasskey, logout, registerPasskey } from './auth.js';
 import { localizeRecipe, recipeLanguage } from './i18n.js';
+import AddMenu from './components/AddMenu.jsx';
 import Categories from './components/Categories.jsx';
 import ChooseUsername from './components/ChooseUsername.jsx';
+import Icon from './components/Icon.jsx';
 import Login from './components/Login.jsx';
 import RecipeDetail from './components/RecipeDetail.jsx';
 import RecipeForm from './components/RecipeForm.jsx';
@@ -48,8 +50,8 @@ export default function App() {
     filtersOpen: false,
   });
   const listScroll = useRef(0);
-  // Per-recipe language picks, kept here so a choice made on a card survives
-  // opening the recipe and coming back. Not saved: a reload starts from the
+  // Per-recipe language picks, kept here so a choice made on a recipe survives
+  // leaving it and coming back. Not saved: a reload starts from the
   // reader's default again.
   const [overrides, setOverrides] = useState({});
   // Recipes being translated right now, by id.
@@ -175,12 +177,6 @@ export default function App() {
     window.location.hash = '#/';
   }
 
-  // The sign-in link renders only where the owner plausibly is: local dev, the
-  // installed PWA, or a browser that has already used a passkey. Visitors never
-  // see it; a fresh browser can still reach #/login by typing the URL.
-  const showSignIn =
-    devMode || hasDevicePasskey() || window.matchMedia('(display-mode: standalone)').matches;
-
   // What readers see: each recipe in its own language, which is the reader's
   // default (the header switch) unless they picked another for that recipe. The
   // form edits the untouched `recipes` instead, so a translation is never saved
@@ -244,7 +240,13 @@ export default function App() {
     );
   } else if (route === '/settings') {
     page = user ? (
-      <Settings user={user} me={me} onSignOut={signOut} />
+      <Settings
+        user={user}
+        me={me}
+        categoryCount={categories.length}
+        tagCount={tags.length}
+        onSignOut={signOut}
+      />
     ) : (
       <Login onLogin={setUser} />
     );
@@ -271,9 +273,6 @@ export default function App() {
         filters={filters}
         onFilters={setFilters}
         scrollRef={listScroll}
-        canEdit={Boolean(user)}
-        inFlight={inFlight}
-        onViewLanguage={onViewLanguage}
       />
     );
   }
@@ -287,22 +286,16 @@ export default function App() {
       {!bare && (
         <header className="header">
           <a href="#/" className="wordmark">{t('appName')}</a>
-          <nav className="nav">
-            {user ? (
-              <>
-                <a className="btn primary small" href="#/new">{t('newRecipe')}</a>
-                <a className="btn ghost small" href="#/categories">{t('categories')}</a>
-                <a className="btn ghost small" href="#/tags">{t('tags')}</a>
-                <a className="icon-btn" href="#/settings" aria-label={t('settings')} title={t('settings')}>
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
-                    <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
-                  </svg>
-                </a>
-              </>
-            ) : showSignIn ? (
-              <a className="btn ghost small" href="#/login">{t('signIn')}</a>
-            ) : null}
-          </nav>
+          {/* No sign-in button: members arrive through the invite link to
+              #/login, so visitors see only the book. */}
+          {user && (
+            <nav className="nav">
+              {route === '/' && <AddMenu />}
+              <a className="icon-btn" href="#/settings" aria-label={t('settings')} title={t('settings')}>
+                <Icon name="user" />
+              </a>
+            </nav>
+          )}
         </header>
       )}
       <main>
