@@ -44,6 +44,7 @@ export default function App() {
     categoryId: null,
     tag: null,
     ingredient: '',
+    createdBy: null,
     filtersOpen: false,
   });
   const listScroll = useRef(0);

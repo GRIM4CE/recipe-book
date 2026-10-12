@@ -93,6 +93,31 @@ describe('filterRecipes', () => {
   });
 });
 
+describe('filterRecipes by person', () => {
+  const made = [
+    { id: 1, title: 'Soup', createdBy: 'jon', tags: ['Slow Cooked'] },
+    { id: 2, title: 'Salad', createdBy: 'marie' },
+    { id: 3, title: 'Stew', createdBy: 'jon' },
+  ];
+
+  it('keeps only recipes added by that person', () => {
+    expect(filterRecipes(made, { createdBy: 'jon' }).map((r) => r.id)).toEqual([1, 3]);
+    expect(filterRecipes(made, { createdBy: 'marie' }).map((r) => r.id)).toEqual([2]);
+    expect(filterRecipes(made, { createdBy: 'nobody' })).toEqual([]);
+  });
+
+  it('shows everyone when unset', () => {
+    expect(filterRecipes(made, { createdBy: null })).toHaveLength(3);
+  });
+
+  it('combines with the other filters', () => {
+    expect(filterRecipes(made, { createdBy: 'jon', tag: 'Slow Cooked' }).map((r) => r.id)).toEqual([
+      1,
+    ]);
+    expect(filterRecipes(made, { createdBy: 'marie', query: 'soup' })).toEqual([]);
+  });
+});
+
 describe('fuzzy and synonym search', () => {
   const items = [
     {

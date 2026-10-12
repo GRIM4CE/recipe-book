@@ -86,13 +86,14 @@ function matchesQuery(contentWords, queryWords) {
 
 export function filterRecipes(
   recipes,
-  { query = '', categoryId = null, tag = null, ingredient = '' } = {},
+  { query = '', categoryId = null, tag = null, ingredient = '', createdBy = null } = {},
 ) {
   const queryWords = tokenize(query);
   const ing = fold(ingredient.trim());
   return recipes.filter((r) => {
     if (categoryId != null && r.category?.id !== categoryId) return false;
     if (tag != null && !(r.tags ?? []).includes(tag)) return false;
+    if (createdBy != null && r.createdBy !== createdBy) return false;
     if (ing && !(r.ingredients ?? []).some((line) => fold(line).includes(ing)))
       return false;
     if (queryWords.length === 0) return true;

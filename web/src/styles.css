@@ -892,6 +892,12 @@ body {
   margin: 0;
 }
 
+.filter-people {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .filter-ingredient {
   display: flex;
   flex-direction: column;
