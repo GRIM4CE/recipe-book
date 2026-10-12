@@ -129,6 +129,17 @@ export const STRINGS = {
     // Settings
     signedInAs: 'Signed in as',
     signOut: 'Sign out',
+    inviteTitle: 'Invite someone',
+    inviteHint: 'They get an account on this recipe book.',
+    email: 'Email',
+    invite: 'Invite',
+    inviting: 'Inviting…',
+    invited: '{name} can sign in now. Tell them:',
+    inviteStep1: 'Open {url}',
+    inviteStep2: 'Enter the username “{name}”',
+    inviteStep3: 'Choose “Email me a code instead” and enter the code from their inbox',
+    inviteStep4: 'Accept the “Add a passkey” banner; after that it’s Face ID / fingerprint only',
+    inviteAnother: 'Invite someone else',
   },
   fr: {
     appName: 'Livre de recettes',
@@ -244,6 +255,18 @@ export const STRINGS = {
 
     signedInAs: 'Connecté en tant que',
     signOut: 'Se déconnecter',
+    inviteTitle: 'Inviter quelqu’un',
+    inviteHint: 'Ils auront un compte sur ce livre de recettes.',
+    email: 'E-mail',
+    invite: 'Inviter',
+    inviting: 'Invitation…',
+    invited: '{name} peut maintenant se connecter. À leur dire :',
+    inviteStep1: 'Ouvrir {url}',
+    inviteStep2: 'Saisir le nom d’utilisateur « {name} »',
+    inviteStep3: 'Choisir « Recevoir plutôt un code par e-mail » et saisir le code reçu',
+    inviteStep4:
+      'Accepter la bannière « Ajouter une clé d’accès » ; ensuite ce sera Face ID ou empreinte uniquement',
+    inviteAnother: 'Inviter quelqu’un d’autre',
   },
 };
 

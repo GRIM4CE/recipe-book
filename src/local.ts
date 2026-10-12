@@ -7,6 +7,7 @@ import { createDb } from "./db.js";
 import { createClaudeExtractor } from "./extract.js";
 import { createClaudeTranslator } from "./translate.js";
 import { createLocalPresigner, createS3Presigner } from "./uploads.js";
+import { createCognitoInviter } from "./users.js";
 
 const config = loadConfig();
 if (config.dbUrl.startsWith("file:")) mkdirSync(config.dataDir, { recursive: true });
@@ -41,6 +42,13 @@ const app = createApp({
     : null,
   translator: config.anthropicApiKey
     ? createClaudeTranslator({ apiKey: config.anthropicApiKey })
+    : null,
+  adminUsernames: config.adminUsernames,
+  inviter: config.authEnabled
+    ? createCognitoInviter({
+        userPoolId: config.cognitoUserPoolId,
+        region: config.cognitoRegion,
+      })
     : null,
 });
 

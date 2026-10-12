@@ -5,8 +5,10 @@ import { createClient, type Client } from "@libsql/client";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
+import type { TokenVerifier } from "../src/auth.js";
 import { createDb, type Db } from "../src/db.js";
 import type { TranslatableFields, Translator } from "../src/translate.js";
+import type { UserInviter } from "../src/users.js";
 
 // Prefixes every string with the target language so tests can see what was
 // translated; records calls, and throws when told to.
@@ -30,6 +32,27 @@ function stubTranslator() {
   };
   return { translator, calls, state };
 }
+
+// Records invites instead of calling Cognito; answers "exists" when told to.
+function stubInviter() {
+  const calls: { username: string; email: string }[] = [];
+  const state = { exists: false };
+  const inviter: UserInviter = {
+    async invite(input) {
+      calls.push(input);
+      return state.exists ? "exists" : "created";
+    },
+  };
+  return { inviter, calls, state };
+}
+
+// "<name>-token" signs in as <name>, so a test picks who is calling.
+const namedVerifier: TokenVerifier = {
+  async verify(token) {
+    if (!token.endsWith("-token")) throw new Error("bad token");
+    return { username: token.slice(0, -"-token".length) };
+  },
+};
 
 let dir: string;
 let client: Client;
@@ -545,6 +568,81 @@ describe("tags", () => {
       (await request(app).put("/api/tags/99999").send({ name: "Ghost" })).status,
     ).toBe(404);
     expect((await request(app).delete("/api/tags/99999")).status).toBe(404);
+  });
+});
+
+describe("invites", () => {
+  const inviteApp = (inviter: UserInviter | null) =>
+    createApp({
+      db,
+      verifier: namedVerifier,
+      inviter,
+      adminUsernames: ["alice"],
+    });
+  const post = (a: ReturnType<typeof createApp>, as: string, body: object) =>
+    request(a).post("/api/users").set("Authorization", `Bearer ${as}-token`).send(body);
+  const valid = { username: "cousin", email: "cousin@example.com" };
+
+  it("reports who is signed in and whether they can invite", async () => {
+    const a = inviteApp(null);
+    const admin = await request(a).get("/api/me").set("Authorization", "Bearer alice-token");
+    expect(admin.body).toEqual({ username: "alice", canInvite: true });
+    const other = await request(a).get("/api/me").set("Authorization", "Bearer bob-token");
+    expect(other.body).toEqual({ username: "bob", canInvite: false });
+    expect((await request(a).get("/api/me")).status).toBe(401);
+  });
+
+  it("turns away a non-admin even when invites are configured", async () => {
+    const { inviter, calls } = stubInviter();
+    const res = await post(inviteApp(inviter), "bob", valid);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe("only an admin can invite");
+    expect(calls).toEqual([]);
+  });
+
+  it("503s for an admin when no inviter is configured", async () => {
+    const res = await post(inviteApp(null), "alice", valid);
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe("invites are not configured");
+  });
+
+  it("rejects an invalid username or email", async () => {
+    const { inviter, calls } = stubInviter();
+    const a = inviteApp(inviter);
+    const cases: [object, string][] = [
+      [{ email: valid.email }, "username is required"],
+      [{ ...valid, username: "   " }, "username is required"],
+      [{ ...valid, username: "x".repeat(65) }, "username is required"],
+      [{ ...valid, username: "two words" }, "username must not contain spaces"],
+      [{ username: valid.username }, "email must be a valid address"],
+      [{ ...valid, email: "not-an-email" }, "email must be a valid address"],
+      [{ ...valid, email: "a b@example.com" }, "email must be a valid address"],
+    ];
+    for (const [body, error] of cases) {
+      const res = await post(a, "alice", body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(res.body.error).toBe(error);
+    }
+    expect(calls).toEqual([]);
+  });
+
+  it("invites with the trimmed username and answers 201", async () => {
+    const { inviter, calls } = stubInviter();
+    const res = await post(inviteApp(inviter), "alice", {
+      username: "  cousin ",
+      email: "cousin@example.com",
+    });
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ username: "cousin" });
+    expect(calls).toEqual([{ username: "cousin", email: "cousin@example.com" }]);
+  });
+
+  it("409s when the username is already taken", async () => {
+    const { inviter, state } = stubInviter();
+    state.exists = true;
+    const res = await post(inviteApp(inviter), "alice", valid);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe("that username is already taken");
   });
 });
 
