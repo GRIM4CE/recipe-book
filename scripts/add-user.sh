@@ -29,5 +29,5 @@ Created $username ($email). Tell them:
   1. Open ${APP_URL:-<app url>}/#/login (the sign-in link is hidden from visitors)
   2. Enter the username "$username"
   3. Choose "Email me a code instead" and enter the code from their inbox
-  4. Accept the "Add a passkey" banner; after that it is Face ID/fingerprint only
+  4. Accept the "Add a passkey" banner; after that signing in is just Face ID or a fingerprint
 MSG

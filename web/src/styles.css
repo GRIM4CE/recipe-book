@@ -764,13 +764,23 @@ body {
 }
 
 .invite-message {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   font: inherit;
+  color: inherit;
   white-space: pre-wrap;
   background: var(--bg);
+  border: 1px solid transparent;
   border-radius: 8px;
   padding: 12px 14px;
   margin: 12px 0;
-  user-select: text;
+  resize: vertical;
+}
+
+.invite-message:focus-visible {
+  outline: none;
+  border-color: var(--ink);
 }
 
 .invite-actions {

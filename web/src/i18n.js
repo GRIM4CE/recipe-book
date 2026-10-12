@@ -145,7 +145,7 @@ export const STRINGS = {
     sendInvite: 'Send invitation',
     inviteCopied: 'Invitation copied',
     inviteMessage:
-      'You’re invited to Recipe Book.\n\n1. Open {url}\n2. Sign in with your email: {email}\n3. Choose “Email me a code instead” and enter the code from your inbox\n4. Accept the “Add a passkey” banner — after that it’s Face ID or fingerprint only',
+      'You’re invited to Recipe Book.\n\n1. Open {url}\n2. Sign in with your email: {email}\n3. Choose “Email me a code instead” and enter the code from your inbox\n4. Accept the “Add a passkey” banner — after that, signing in is just Face ID or your fingerprint',
     inviteAnother: 'Invite someone else',
   },
   fr: {
@@ -278,7 +278,7 @@ export const STRINGS = {
     sendInvite: 'Envoyer l’invitation',
     inviteCopied: 'Invitation copiée',
     inviteMessage:
-      'Vous êtes invité·e sur Livre de recettes.\n\n1. Ouvrez {url}\n2. Connectez-vous avec votre e-mail : {email}\n3. Choisissez « Recevoir plutôt un code par e-mail » et saisissez le code reçu\n4. Acceptez la bannière « Ajouter une clé d’accès » — ensuite ce sera Face ID ou empreinte uniquement',
+      'Vous êtes invité·e sur Livre de recettes.\n\n1. Ouvrez {url}\n2. Connectez-vous avec votre e-mail : {email}\n3. Choisissez « Recevoir plutôt un code par e-mail » et saisissez le code reçu\n4. Acceptez la bannière « Ajouter une clé d’accès » — ensuite, la connexion se fait simplement par Face ID ou empreinte',
     inviteAnother: 'Inviter quelqu’un d’autre',
   },
 };
