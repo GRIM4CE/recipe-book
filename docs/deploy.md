@@ -130,6 +130,7 @@ Variables:
 |---|---|
 | `AWS_ROLE_ARN` | the role ARN echoed by the setup above |
 | `WEB_ORIGIN` | leave unset for now — filled in at step 4 |
+| `ADMIN_USERNAMES` | your Cognito username; comma-separate several. Who may invite from the app |
 
 ### First deploy + smoke test
 
@@ -147,18 +148,20 @@ curl <ApiUrl>/api/recipes                # {"recipes":[]}
 ### Create accounts
 
 Sign-in is passkey-first with email codes as bootstrap/recovery, so each
-account needs a verified email and no usable password (the script sets a
-random one, which only clears Cognito's initial challenge state; the app
-client has no password flow):
+account needs a verified email and no usable password (a random one is set,
+which only clears Cognito's initial challenge state; the app client has no
+password flow).
 
-```sh
-npm run add-user -- <name> <email>
-```
+Set `ADMIN_USERNAMES` to your username (then deploy once), sign in, open
+Settings → Invite someone, enter their username and email; the page shows
+what to tell them. Your own account, the first one, has to come from the CLI
+below, since nobody can invite before an admin exists.
 
-It reads `USER_POOL_ID` from the environment, or looks it up from the stack
-outputs above, and runs `admin-create-user` (verified email, `--message-action
-SUPPRESS`) then `admin-set-user-password --permanent`. Any later account, say
-a relative joining, is the same command.
+The CLI alternative is `npm run add-user -- <name> <email>`. It reads
+`USER_POOL_ID` from the environment, or looks it up from the stack outputs
+above, and runs `admin-create-user` (verified email, `--message-action
+SUPPRESS`) then `admin-set-user-password --permanent`: the same two calls the
+app makes.
 
 The sign-in link is hidden from visitors, so a new person's first sign-in
 goes to `<app url>/#/login`. On each device: enter the username, choose “Email

@@ -21,6 +21,9 @@ export interface Config {
   cognitoClientId: string;
   cognitoRegion: string;
   authEnabled: boolean;
+  // Usernames allowed to invite new accounts from the app (ADMIN_USERNAMES,
+  // comma-separated). Empty = nobody can.
+  adminUsernames: string[];
   // S3 photo storage. Empty bucket = local-disk photo mode under dataDir.
   s3Bucket: string;
   s3Region: string;
@@ -48,6 +51,10 @@ export function loadConfig(): Config {
     cognitoClientId,
     cognitoRegion: process.env.COGNITO_REGION ?? region,
     authEnabled: Boolean(cognitoUserPoolId && cognitoClientId),
+    adminUsernames: (process.env.ADMIN_USERNAMES ?? "")
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean),
     s3Bucket,
     s3Region: process.env.S3_REGION ?? region,
     s3Enabled: Boolean(s3Bucket),
