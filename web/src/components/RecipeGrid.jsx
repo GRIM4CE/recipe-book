@@ -35,14 +35,17 @@ export default function RecipeGrid({
   onViewLanguage,
 }) {
   const { t } = useLanguage();
-  const { query, categoryId, tag, ingredient, filtersOpen } = filters;
+  const { query, categoryId, tag, ingredient, createdBy, filtersOpen } = filters;
   const set = (patch) => onFilters({ ...filters, ...patch });
   const stacksRef = useRef(null);
   const twoColumns = useTwoColumns();
   const tagNames = [...new Set(recipes.flatMap((r) => r.tags ?? []))].sort((a, b) =>
     a.localeCompare(b),
   );
-  const matched = filterRecipes(recipes, { query, categoryId, tag, ingredient });
+  const people = [...new Set(recipes.map((r) => r.createdBy).filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+  const matched = filterRecipes(recipes, { query, categoryId, tag, ingredient, createdBy });
   const visible = matched.slice(0, MAX_SHOWN);
   const columns = twoColumns
     ? [visible.slice(0, Math.ceil(visible.length / 2)), visible.slice(Math.ceil(visible.length / 2))]
@@ -50,9 +53,13 @@ export default function RecipeGrid({
 
   // Tags + ingredient live inside the collapsed panel, so surface a count on
   // the toggle to hint at active filters you can't currently see.
-  const hiddenCount = (tag ? 1 : 0) + (ingredient.trim() ? 1 : 0);
+  const hiddenCount = (tag ? 1 : 0) + (ingredient.trim() ? 1 : 0) + (createdBy ? 1 : 0);
   const hasFilters =
-    Boolean(query.trim()) || categoryId != null || tag != null || Boolean(ingredient.trim());
+    Boolean(query.trim()) ||
+    categoryId != null ||
+    tag != null ||
+    Boolean(ingredient.trim()) ||
+    createdBy != null;
 
   // The stack claims whatever height the search and filters leave over; CSS then
   // divides it across the cards, so a longer list packs tighter on its own.
@@ -74,7 +81,7 @@ export default function RecipeGrid({
   }, [scrollRef]);
 
   function clearFilters() {
-    set({ query: '', categoryId: null, tag: null, ingredient: '' });
+    set({ query: '', categoryId: null, tag: null, ingredient: '', createdBy: null });
   }
 
   // Draws from everything that matched, not just the slats on screen.
@@ -156,6 +163,24 @@ export default function RecipeGrid({
                   #{name}
                 </button>
               ))}
+            </div>
+          )}
+          {people.length >= 2 && (
+            <div className="filter-people">
+              <span className="field-title">{t('byPerson')}</span>
+              <div className="chips" role="tablist">
+                {people.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    className={createdBy === name ? 'chip active' : 'chip'}
+                    style={{ '--chip-color': '#8b8378' }}
+                    onClick={() => set({ createdBy: createdBy === name ? null : name })}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           <button

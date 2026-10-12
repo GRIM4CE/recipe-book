@@ -385,6 +385,15 @@ export function createDb(client: Client) {
       }));
     },
 
+    // Recipes per `created_by` value, exactly as stored: a display name for
+    // recipes signed after a person chose one, the sign-in name before that.
+    async countRecipesByCreator(): Promise<Map<string, number>> {
+      const rs = await client.execute(
+        "SELECT created_by, COUNT(*) AS n FROM recipes GROUP BY created_by",
+      );
+      return new Map(rs.rows.map((row) => [String(row.created_by), Number(row.n)]));
+    },
+
     async renameTag(id: number, name: string): Promise<TagRenameResult> {
       const existing = await client.execute({
         sql: "SELECT id FROM tags WHERE id = ?",
