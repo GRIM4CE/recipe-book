@@ -39,6 +39,13 @@ const RESULT_SCHEMA = {
   additionalProperties: false,
 };
 
+// The household reads French recipes in metric, so translating into French
+// converts measures; translating into English only translates the words.
+const UNIT_RULES: Record<Language, string> = {
+  fr: "- convert imperial and US customary measures to metric in the ingredients and instructions: cups, tablespoons and teaspoons to millilitres for liquids or grams for dry goods (1 cup flour ≈ 125 g, 1 cup sugar ≈ 200 g, 1 cup butter ≈ 225 g, 1 cup liquid ≈ 240 ml, 1 tbsp ≈ 15 ml, 1 tsp ≈ 5 ml; when the ingredient is unclear, use millilitres), ounces and pounds to grams (kilograms above 1000 g), fluid ounces to millilitres, inches to centimetres, and Fahrenheit to Celsius. Round to kitchen-sensible numbers (nearest 5 g, 5 ml or 5 °C, e.g. 350 °F → 180 °C). Write units the French way (g, kg, ml, l, cl where natural, °C, cm). Keep counts as they are (2 œufs). Keep small spoon measures as c. à soupe / c. à café only when converting to ml would read oddly (1 c. à café de sel is fine).",
+  en: "- keep quantities and units as written (metric stays metric, do not convert to imperial); only translate the words, using the usual English abbreviations (c. à soupe → tbsp, c. à café → tsp, tasse → cup).",
+};
+
 export function buildPrompt(input: TranslateInput): string {
   const from = LANGUAGE_NAMES[input.from];
   const to = LANGUAGE_NAMES[input.to];
@@ -47,7 +54,7 @@ export function buildPrompt(input: TranslateInput): string {
     "Rules:",
     `- translate every field from ${from} to ${to}.`,
     "- ingredients and instructions: keep the same number of entries in the same order, translating one entry per entry.",
-    "- keep quantities and numbers as written, but convert unit names to the usual abbreviations of the target language (tbsp ↔ c. à soupe, tsp ↔ c. à café, cup ↔ tasse).",
+    UNIT_RULES[input.to],
     "- leave URLs, proper nouns and brand names untouched.",
     "- an empty string stays empty.",
     "- return only the JSON.",

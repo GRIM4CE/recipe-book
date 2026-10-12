@@ -24,9 +24,18 @@ describe("buildPrompt", () => {
     expect(prompt).toMatch(/same number of entries in the same order/);
   });
 
-  it("converts unit names but not quantities", () => {
-    expect(prompt).toContain("keep quantities and numbers as written");
-    expect(prompt).toContain("tbsp ↔ c. à soupe, tsp ↔ c. à café, cup ↔ tasse");
+  it("converts to metric when translating into French", () => {
+    const fr = buildPrompt({ from: "en", to: "fr", recipe });
+    expect(fr).toContain("to metric");
+    expect(fr).toContain("grams");
+    expect(fr).toContain("millilitres");
+    expect(fr).toContain("Celsius");
+    expect(fr).toContain("350 °F → 180 °C");
+  });
+
+  it("keeps quantities as written when translating into English", () => {
+    expect(prompt).toContain("keep quantities and units as written");
+    expect(prompt).not.toContain("Celsius");
   });
 
   it("leaves URLs, proper nouns and brands alone, and empties empty", () => {
