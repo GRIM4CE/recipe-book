@@ -144,13 +144,12 @@ function parseInviteInput(
 ): { username: string; email: string } | string {
   if (typeof body !== "object" || body === null) return "body must be an object";
   const b = body as Record<string, unknown>;
-  const username = typeof b.username === "string" ? b.username.trim() : "";
-  if (!username || username.length > 64) return "username is required";
-  if (/\s/.test(username)) return "username must not contain spaces";
-  if (typeof b.email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email)) {
+  if (typeof b.email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email.trim())) {
     return "email must be a valid address";
   }
-  return { username, email: b.email };
+  // The email is the sign-in name, lowercased so it matches however it's typed.
+  const email = b.email.trim();
+  return { username: email.toLowerCase(), email };
 }
 
 function parseTagName(body: unknown): string | null {
@@ -580,10 +579,10 @@ export function createApp(opts: AppOptions) {
       return;
     }
     if ((await opts.inviter.invite(input)) === "exists") {
-      res.status(409).json({ error: "that username is already taken" });
+      res.status(409).json({ error: "that email already has an account" });
       return;
     }
-    res.status(201).json({ username: input.username });
+    res.status(201).json({ username: input.username, email: input.email });
   });
 
   app.use(

@@ -153,18 +153,21 @@ which only clears Cognito's initial challenge state; the app client has no
 password flow).
 
 Set `ADMIN_USERNAMES` to your username (then deploy once), sign in, open
-Settings → Invite someone, enter their username and email; the page shows
-what to tell them. Your own account, the first one, has to come from the CLI
-below, since nobody can invite before an admin exists.
+Settings → Invite someone, enter just their email; their sign-in name is that
+email (lowercased), and the page offers to send them the instructions. Your
+own account, the first one, has to come from the CLI below, since nobody can
+invite before an admin exists.
 
-The CLI alternative is `npm run add-user -- <name> <email>`. It reads
+The CLI alternative is `npm run add-user -- <name> <email>`; pass the email
+for both (`npm run add-user -- <email> <email>`) to get the same result as the
+in-app invite. It reads
 `USER_POOL_ID` from the environment, or looks it up from the stack outputs
 above, and runs `admin-create-user` (verified email, `--message-action
 SUPPRESS`) then `admin-set-user-password --permanent`: the same two calls the
 app makes.
 
 The sign-in link is hidden from visitors, so a new person's first sign-in
-goes to `<app url>/#/login`. On each device: enter the username, choose “Email
+goes to `<app url>/#/login`. On each device: enter the email, choose “Email
 me a code instead”, then accept the “Add a passkey” banner. After that it's
 Face ID/fingerprint only. A lost phone just repeats this bootstrap.
 

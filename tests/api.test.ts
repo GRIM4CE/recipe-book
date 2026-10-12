@@ -581,7 +581,7 @@ describe("invites", () => {
     });
   const post = (a: ReturnType<typeof createApp>, as: string, body: object) =>
     request(a).post("/api/users").set("Authorization", `Bearer ${as}-token`).send(body);
-  const valid = { username: "cousin", email: "cousin@example.com" };
+  const valid = { email: "cousin@example.com" };
 
   it("reports who is signed in and whether they can invite", async () => {
     const a = inviteApp(null);
@@ -606,43 +606,55 @@ describe("invites", () => {
     expect(res.body.error).toBe("invites are not configured");
   });
 
-  it("rejects an invalid username or email", async () => {
+  it("rejects a missing or invalid email", async () => {
     const { inviter, calls } = stubInviter();
     const a = inviteApp(inviter);
-    const cases: [object, string][] = [
-      [{ email: valid.email }, "username is required"],
-      [{ ...valid, username: "   " }, "username is required"],
-      [{ ...valid, username: "x".repeat(65) }, "username is required"],
-      [{ ...valid, username: "two words" }, "username must not contain spaces"],
-      [{ username: valid.username }, "email must be a valid address"],
-      [{ ...valid, email: "not-an-email" }, "email must be a valid address"],
-      [{ ...valid, email: "a b@example.com" }, "email must be a valid address"],
+    const bodies: object[] = [
+      {},
+      { username: "cousin" },
+      { email: 5 },
+      { email: "not-an-email" },
+      { email: "a b@example.com" },
+      { email: "   " },
     ];
-    for (const [body, error] of cases) {
+    for (const body of bodies) {
       const res = await post(a, "alice", body);
       expect(res.status, JSON.stringify(body)).toBe(400);
-      expect(res.body.error).toBe(error);
+      expect(res.body.error).toBe("email must be a valid address");
     }
     expect(calls).toEqual([]);
   });
 
-  it("invites with the trimmed username and answers 201", async () => {
+  it("uses the email as the username and answers 201", async () => {
     const { inviter, calls } = stubInviter();
-    const res = await post(inviteApp(inviter), "alice", {
-      username: "  cousin ",
-      email: "cousin@example.com",
-    });
+    const res = await post(inviteApp(inviter), "alice", valid);
     expect(res.status).toBe(201);
-    expect(res.body).toEqual({ username: "cousin" });
-    expect(calls).toEqual([{ username: "cousin", email: "cousin@example.com" }]);
+    expect(res.body).toEqual({ username: "cousin@example.com", email: "cousin@example.com" });
+    expect(calls).toEqual([{ username: "cousin@example.com", email: "cousin@example.com" }]);
   });
 
-  it("409s when the username is already taken", async () => {
+  it("lowercases the username but passes the email as given", async () => {
+    const { inviter, calls } = stubInviter();
+    const res = await post(inviteApp(inviter), "alice", { email: " Cousin@Example.com " });
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ username: "cousin@example.com", email: "Cousin@Example.com" });
+    expect(calls).toEqual([{ username: "cousin@example.com", email: "Cousin@Example.com" }]);
+  });
+
+  it("ignores a username in the body", async () => {
+    const { inviter, calls } = stubInviter();
+    const res = await post(inviteApp(inviter), "alice", { ...valid, username: "someone-else" });
+    expect(res.status).toBe(201);
+    expect(res.body.username).toBe("cousin@example.com");
+    expect(calls).toEqual([{ username: "cousin@example.com", email: "cousin@example.com" }]);
+  });
+
+  it("409s when the email already has an account", async () => {
     const { inviter, state } = stubInviter();
     state.exists = true;
     const res = await post(inviteApp(inviter), "alice", valid);
     expect(res.status).toBe(409);
-    expect(res.body.error).toBe("that username is already taken");
+    expect(res.body.error).toBe("that email already has an account");
   });
 });
 
