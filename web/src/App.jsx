@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
-import { currentUser, devMode, hasDevicePasskey, logout, registerPasskey } from './auth.js';
+import { currentUser, logout } from './auth.js';
 import { localizeRecipe, recipeLanguage } from './i18n.js';
 import AddMenu from './components/AddMenu.jsx';
 import Categories from './components/Categories.jsx';
@@ -34,7 +34,6 @@ export default function App() {
   // Who the API says is signed in: their chosen username, and whether they
   // still have to pick one. Null while signed out or until it loads.
   const [me, setMe] = useState(null);
-  const [offerPasskey, setOfferPasskey] = useState(false);
   const [recipes, setRecipes] = useState(null);
   const [categories, setCategories] = useState([]);
   const [tags, setTags] = useState([]);
@@ -89,22 +88,9 @@ export default function App() {
     };
   }, [user]);
 
-  useEffect(() => {
-    setOfferPasskey(Boolean(user) && !devMode && !hasDevicePasskey());
-  }, [user]);
-
   async function saveUsername(username) {
     await api.setUsername(username);
     setMe(await api.me());
-  }
-
-  async function addPasskey() {
-    try {
-      await registerPasskey();
-      setOfferPasskey(false);
-    } catch (err) {
-      window.alert(err.message);
-    }
   }
 
   // Nothing is translated here: a translation is made when someone picks that
@@ -277,9 +263,6 @@ export default function App() {
     );
   }
 
-  const showSignIn =
-    devMode || hasDevicePasskey() || window.matchMedia('(display-mode: standalone)').matches;
-
   // A recipe fills the screen on its own: no wordmark, no nav, just the card
   // and its own back button.
   const bare = Boolean(detailMatch) && !error && !choosingUsername;
@@ -289,9 +272,7 @@ export default function App() {
       {!bare && (
         <header className="header">
           <a href="#/" className="wordmark">{t('appName')}</a>
-          {/* Visitors see only the book: the sign-in icon shows where a member
-              plausibly is (the installed app, a phone that has used a passkey,
-              local dev). Anyone else reaches #/login through the invite link. */}
+          {/* Visitors see the sign-in icon; the login page itself is just a Cognito form. */}
           {user ? (
             <nav className="nav">
               {route === '/' && <AddMenu />}
@@ -299,27 +280,16 @@ export default function App() {
                 <Icon name="user" />
               </a>
             </nav>
-          ) : showSignIn ? (
+          ) : (
             <nav className="nav">
               <a className="icon-btn" href="#/login" aria-label={t('signIn')} title={t('signIn')}>
                 <Icon name="user" />
               </a>
             </nav>
-          ) : null}
+          )}
         </header>
       )}
       <main>
-        {offerPasskey && (
-          <p className="notice">
-            {t('passkeyOffer')}{' '}
-            <button className="btn primary small" type="button" onClick={addPasskey}>
-              {t('addPasskey')}
-            </button>{' '}
-            <button className="btn ghost small" type="button" onClick={() => setOfferPasskey(false)}>
-              {t('notNow')}
-            </button>
-          </p>
-        )}
         {page}
       </main>
     </div>

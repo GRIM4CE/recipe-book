@@ -18,10 +18,6 @@ Parameters:
     Type: String
     Default: ''
     Description: Deployed web origin allowed by CORS (the Amplify URL)
-  WebAuthnRpId:
-    Type: String
-    Default: localhost
-    Description: Passkey relying-party ID (the web app's bare domain; CI derives it from WebOrigin)
   AnthropicApiKey:
     Type: String
     NoEcho: true
@@ -85,10 +81,8 @@ Resources:
     Type: AWS::Cognito::UserPool
     Properties:
       UserPoolName: recipe-book-users
-      # Essentials unlocks choice-based sign-in (passkeys + email OTP).
+      # Essentials unlocks choice-based sign-in (email OTP).
       UserPoolTier: ESSENTIALS
-      WebAuthnRelyingPartyID: !Ref WebAuthnRpId
-      WebAuthnUserVerification: required
       # Accounts are created by an admin (Settings → Invite in the app, or
       # scripts/add-user.sh); nobody can sign up.
       AdminCreateUserConfig:
@@ -103,7 +97,7 @@ Resources:
         SignInPolicy:
           # AWS refuses to drop PASSWORD from this list; the app client has
           # no password flow and recovery is admin-only, so it stays inert.
-          AllowedFirstAuthFactors: [PASSWORD, WEB_AUTHN, EMAIL_OTP]
+          AllowedFirstAuthFactors: [PASSWORD, EMAIL_OTP]
         PasswordPolicy:
           MinimumLength: 12
           RequireLowercase: false
@@ -120,7 +114,7 @@ Resources:
       ExplicitAuthFlows:
         - ALLOW_USER_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
-      # A device stays signed in for a year; renewal is one biometric tap.
+      # A device stays signed in for a year; renewal is one email code.
       RefreshTokenValidity: 365
       TokenValidityUnits:
         RefreshToken: days

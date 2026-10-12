@@ -26,8 +26,7 @@ aws cognito-idp admin-set-user-password \
 cat <<MSG
 
 Created $username ($email). Tell them:
-  1. Open ${APP_URL:-<app url>}/#/login (the sign-in link is hidden from visitors)
+  1. Open the app and tap the sign-in icon (or open ${APP_URL:-<app url>}/#/login)
   2. Enter the username "$username"
-  3. Choose "Email me a code instead" and enter the code from their inbox
-  4. Accept the "Add a passkey" banner; after that signing in is just Face ID or a fingerprint
+  3. Enter the code from their inbox
 MSG

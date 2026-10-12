@@ -21,9 +21,6 @@ export const STRINGS = {
     tags: 'Tags',
     settings: 'Settings',
     signIn: 'Sign in',
-    passkeyOffer: 'Add a passkey to sign in with just Face ID / fingerprint next time.',
-    addPasskey: 'Add passkey',
-    notNow: 'Not now',
     loading: 'Loading…',
     loadError: 'Couldn’t load recipes: {error}',
     recipeMissing: 'That recipe doesn’t exist (anymore).',
@@ -109,9 +106,7 @@ export const STRINGS = {
     devHint: 'Dev mode: any name signs you in, writes run as “dev”.',
     emailCode: 'Code from your email',
     signingIn: 'Signing in…',
-    signInPasskey: 'Sign in with passkey',
     emailMeCode: 'Email me a code',
-    emailMeCodeInstead: 'Email me a code instead',
     sendNewCode: 'Send a new code',
 
     // Categories and tags
@@ -147,7 +142,7 @@ export const STRINGS = {
     sendInvite: 'Send invitation',
     inviteCopied: 'Invitation copied',
     inviteMessage:
-      'You’re invited to Recipe Book.\n\n1. Open {url}\n2. Sign in with your email: {email}\n3. Choose “Email me a code instead” and enter the code from your inbox\n4. Accept the “Add a passkey” banner — after that, signing in is just Face ID or your fingerprint',
+      'You’re invited to Recipe Book.\n\n1. Open {url}\n2. Enter your email: {email}\n3. Enter the code sent to your inbox',
     inviteAnother: 'Invite someone else',
 
     // Redesign: header menu, search field, detail menu and multiplier, settings
@@ -182,10 +177,6 @@ export const STRINGS = {
     tags: 'Étiquettes',
     settings: 'Réglages',
     signIn: 'Se connecter',
-    passkeyOffer:
-      'Ajoutez une clé d’accès pour vous connecter avec Face ID ou votre empreinte la prochaine fois.',
-    addPasskey: 'Ajouter une clé d’accès',
-    notNow: 'Plus tard',
     loading: 'Chargement…',
     loadError: 'Impossible de charger les recettes : {error}',
     recipeMissing: 'Cette recette n’existe pas (ou plus).',
@@ -268,9 +259,7 @@ export const STRINGS = {
     devHint: 'Mode dev : n’importe quel nom vous connecte, les écritures sont faites par « dev ».',
     emailCode: 'Code reçu par e-mail',
     signingIn: 'Connexion…',
-    signInPasskey: 'Se connecter avec une clé d’accès',
     emailMeCode: 'Envoyez-moi un code par e-mail',
-    emailMeCodeInstead: 'Recevoir plutôt un code par e-mail',
     sendNewCode: 'Envoyer un nouveau code',
 
     colorLabel: 'Couleur {color}',
@@ -304,7 +293,7 @@ export const STRINGS = {
     sendInvite: 'Envoyer l’invitation',
     inviteCopied: 'Invitation copiée',
     inviteMessage:
-      'Vous êtes invité·e sur Livre de recettes.\n\n1. Ouvrez {url}\n2. Connectez-vous avec votre e-mail : {email}\n3. Choisissez « Recevoir plutôt un code par e-mail » et saisissez le code reçu\n4. Acceptez la bannière « Ajouter une clé d’accès » — ensuite, la connexion se fait simplement par Face ID ou empreinte',
+      'Vous êtes invité·e sur Livre de recettes.\n\n1. Ouvrez {url}\n2. Saisissez votre e-mail : {email}\n3. Saisissez le code reçu dans votre boîte de réception',
     inviteAnother: 'Inviter quelqu’un d’autre',
 
     add: 'Ajouter',

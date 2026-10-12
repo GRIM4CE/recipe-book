@@ -64,7 +64,6 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ADMIN_USERNAMES: ${{ vars.ADMIN_USERNAMES }}
         run: |
-          RP_ID="${WEB_ORIGIN#https://}"
           # sam rejects empty parameter values; omit the key until the
           # secret exists (the template default then disables the import).
           EXTRA=()
@@ -86,5 +85,4 @@ jobs:
               "DbAuthToken=$DB_AUTH_TOKEN" \
               "ExternalApiSecret=$EXTERNAL_API_SECRET" \
               "WebOrigin=$WEB_ORIGIN" \
-              "WebAuthnRpId=${RP_ID:-localhost}" \
               "${EXTRA[@]}"
