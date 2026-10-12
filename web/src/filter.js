@@ -20,7 +20,18 @@ for (const group of SYNONYM_GROUPS) {
   for (const word of group) SYNONYMS.set(word, group);
 }
 
-const tokenize = (text) => text.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+// Lowercase and strip accents so "Crème", "creme" and "CRÈME" all compare
+// equal. NFD splits "è" into "e" + a combining mark, which we drop; ligatures
+// like "œ" don't decompose, so they're spelled out.
+const fold = (text) =>
+  text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/œ/g, 'oe')
+    .replace(/æ/g, 'ae');
+
+const tokenize = (text) => fold(text).match(/[\p{L}\p{N}]+/gu) ?? [];
 
 // A query word matches a longer content word up to this edit distance. Short
 // words stay exact so "rice" doesn't drag in "race"/"nice"; only longer words
@@ -78,11 +89,11 @@ export function filterRecipes(
   { query = '', categoryId = null, tag = null, ingredient = '' } = {},
 ) {
   const queryWords = tokenize(query);
-  const ing = ingredient.trim().toLowerCase();
+  const ing = fold(ingredient.trim());
   return recipes.filter((r) => {
     if (categoryId != null && r.category?.id !== categoryId) return false;
     if (tag != null && !(r.tags ?? []).includes(tag)) return false;
-    if (ing && !(r.ingredients ?? []).some((line) => line.toLowerCase().includes(ing)))
+    if (ing && !(r.ingredients ?? []).some((line) => fold(line).includes(ing)))
       return false;
     if (queryWords.length === 0) return true;
     const contentWords = tokenize(
