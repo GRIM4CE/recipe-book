@@ -103,7 +103,8 @@ function People({ users }) {
       <ul className="people-list">
         {users.map((u) => (
           <li key={u.username}>
-            <span>{u.email ?? u.username}</span>
+            <span>{u.displayName ?? u.email ?? u.username}</span>
+            {u.displayName && <span className="hint">{u.email ?? u.username}</span>}
             <span className="hint">
               {t('joined', { date: dateFormat.format(new Date(u.createdAt)) })}
               {!u.enabled && ` · ${t('disabled')}`}
@@ -115,9 +116,9 @@ function People({ users }) {
   );
 }
 
-export default function Settings({ user, onSignOut }) {
+export default function Settings({ user, me, onSignOut }) {
   const { t } = useLanguage();
-  const [canInvite, setCanInvite] = useState(false);
+  const canInvite = Boolean(me?.canInvite);
   const [users, setUsers] = useState([]);
 
   // A failed lookup just leaves the admin sections out.
@@ -128,26 +129,16 @@ export default function Settings({ user, onSignOut }) {
       .catch(() => {});
 
   useEffect(() => {
-    let live = true;
-    api
-      .me()
-      .then((me) => {
-        if (!live) return;
-        setCanInvite(Boolean(me.canInvite));
-        if (me.canInvite) loadUsers();
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, []);
+    if (canInvite) loadUsers();
+  }, [canInvite]);
 
   return (
     <div className="settings-page">
       <h2>{t('settings')}</h2>
       <div className="settings-section">
         <p className="settings-label">{t('signedInAs')}</p>
-        <p className="settings-user">{user}</p>
+        <p className="settings-user">{me?.displayName ?? user}</p>
+        {me?.displayName && me.displayName !== user && <p className="hint">{user}</p>}
       </div>
       <div className="settings-section">
         <p className="settings-label">{t('language')}</p>

@@ -126,6 +126,10 @@ export const STRINGS = {
     usedBy: 'Used by {n} recipes',
     noTags: 'No tags yet. Add tags to a recipe and they’ll show up here.',
 
+    // Choose a username
+    chooseTitle: 'Pick your username',
+    chooseHint: 'It’s how your recipes are signed. Letters, numbers, dots, dashes or underscores.',
+
     // Settings
     signedInAs: 'Signed in as',
     signOut: 'Sign out',
@@ -255,6 +259,10 @@ export const STRINGS = {
     rename: 'Renommer',
     usedBy: 'Utilisée par {n} recettes',
     noTags: 'Aucune étiquette pour l’instant. Ajoutez-en à une recette et elles apparaîtront ici.',
+
+    chooseTitle: 'Choisissez votre nom d’utilisateur',
+    chooseHint:
+      'C’est ainsi que vos recettes seront signées. Lettres, chiffres, points, tirets ou tirets bas.',
 
     signedInAs: 'Connecté en tant que',
     signOut: 'Se déconnecter',
