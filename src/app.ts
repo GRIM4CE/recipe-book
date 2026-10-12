@@ -6,7 +6,8 @@ import { requireUser, type TokenVerifier } from "./auth.js";
 import { createExternalRouter } from "./external.js";
 import type { Db } from "./db.js";
 import type { ExtractionResult, Extractor } from "./extract.js";
-import type { Recipe, RecipeInput } from "./types.js";
+import type { Translator } from "./translate.js";
+import { LANGUAGES, type Language, type Recipe, type RecipeInput } from "./types.js";
 import type { Presigner } from "./uploads.js";
 
 export interface AppOptions {
@@ -29,6 +30,9 @@ export interface AppOptions {
   // Turns pasted text or a recipe photo into structured fields. Absent →
   // extraction is disabled (503).
   extractor?: Extractor | null;
+  // Translates a recipe into the other language. Absent → translation is
+  // disabled (503).
+  translator?: Translator | null;
 }
 
 function cors(webOrigin: string): RequestHandler {
@@ -69,6 +73,12 @@ function parseRecipeInput(body: unknown): RecipeInput | string {
     return "notes must be a string";
   }
   if (
+    b.language !== undefined &&
+    !LANGUAGES.includes(b.language as Language)
+  ) {
+    return "language must be en or fr";
+  }
+  if (
     b.categoryId !== undefined &&
     b.categoryId !== null &&
     typeof b.categoryId !== "number"
@@ -94,6 +104,7 @@ function parseRecipeInput(body: unknown): RecipeInput | string {
     summary: (b.summary as string | undefined)?.trim() ?? "",
     servings: (b.servings as string | undefined)?.trim() ?? "",
     notes: (b.notes as string | undefined)?.trim() ?? "",
+    language: b.language as Language | undefined,
     ingredients: ((b.ingredients as string[] | undefined) ?? []).filter((s) =>
       s.trim(),
     ),
@@ -242,6 +253,7 @@ export function createApp(opts: AppOptions) {
           servings: r.servings,
           ingredients: r.ingredients,
           instructions: r.instructions,
+          language: r.language,
           categoryId: category?.id ?? null,
           notes: attributionNotes(sourceUrl, r.credit),
         });
@@ -347,6 +359,7 @@ export function createApp(opts: AppOptions) {
         ingredients: original.ingredients,
         instructions: original.instructions,
         notes: original.notes,
+        language: original.language,
         categoryId: original.category?.id ?? null,
         tags: original.tags,
         photoKey: original.photoKey,
@@ -354,6 +367,44 @@ export function createApp(opts: AppOptions) {
       { createdBy: String(res.locals.username), source: "web" },
     );
     res.status(201).json(serialize(copy));
+  });
+
+  // (Re)generates the recipe's translation into every other language. Always
+  // re-translates, so the UI can use it for both "translate" and "refresh".
+  app.post("/api/recipes/:id/translate", writeAuth, async (req, res) => {
+    if (!opts.translator) {
+      res.status(503).json({ error: "translation is not configured" });
+      return;
+    }
+    const id = Number(req.params.id);
+    const recipe = await db.getRecipe(id);
+    if (!recipe) {
+      res.status(404).json({ error: "recipe not found" });
+      return;
+    }
+    try {
+      for (const to of LANGUAGES) {
+        if (to === recipe.language) continue;
+        const fields = await opts.translator.translate({
+          from: recipe.language,
+          to,
+          recipe: {
+            title: recipe.title,
+            summary: recipe.summary,
+            servings: recipe.servings,
+            ingredients: recipe.ingredients,
+            instructions: recipe.instructions,
+            notes: recipe.notes,
+          },
+        });
+        await db.setTranslation(id, to, fields, recipe.updatedAt);
+      }
+    } catch (err) {
+      console.error("translation failed:", err);
+      res.status(502).json({ error: "translation failed" });
+      return;
+    }
+    res.json(serialize((await db.getRecipe(id)) as Recipe));
   });
 
   app.delete("/api/recipes/:id", writeAuth, async (req, res) => {

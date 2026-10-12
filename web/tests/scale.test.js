@@ -88,6 +88,22 @@ describe('scaleIngredient', () => {
     // 1/4 tsp ÷ 8 = 1/32 tsp: snapped to the nearest sixteenth.
     expect(scaleIngredient('1/4 tsp nutmeg', 0.125)).toBe('1/16 tsp nutmeg');
   });
+
+  it('scales French spoons numerically instead of reading "c." as a cup', () => {
+    expect(scaleIngredient('2 c. à soupe de farine', 2)).toBe('4 c. à soupe de farine');
+    expect(scaleIngredient('1 c. à café de sel', 0.5)).toBe('1/2 c. à café de sel');
+    expect(scaleIngredient("1 cuillère à soupe d'huile", 3)).toBe(
+      "3 cuillère à soupe d'huile",
+    );
+  });
+
+  it('scales French cups (tasses) numerically', () => {
+    expect(scaleIngredient('2 tasses de farine', 2)).toBe('4 tasses de farine');
+  });
+
+  it('still reads an English "c." without "à" as a cup', () => {
+    expect(scaleIngredient('1 c. flour', 2)).toBe('2 cups flour');
+  });
 });
 
 describe('scaleServings', () => {

@@ -186,3 +186,51 @@ describe('filterRecipes across languages', () => {
     expect(filterRecipes([gratin], { query: 'bourbon' })).toHaveLength(0);
   });
 });
+
+describe('accent-insensitive search', () => {
+  const items = [
+    {
+      id: 1,
+      title: 'Crème brûlée',
+      summary: '',
+      ingredients: ['500 ml crème fraîche', '4 œufs'],
+      instructions: ['Caraméliser le sucre.'],
+      category: null,
+    },
+    {
+      id: 2,
+      title: 'Pancakes',
+      summary: '',
+      ingredients: ['2 eggs', '1 cup flour'],
+      instructions: ['Fry.'],
+      category: null,
+    },
+  ];
+  const ids = (opts) => filterRecipes(items, opts).map((r) => r.id);
+
+  it('finds accented content with an accented query', () => {
+    expect(ids({ query: 'crème' })).toEqual([1]);
+    expect(ids({ query: 'brûlée' })).toEqual([1]);
+  });
+
+  it('finds accented content with an unaccented query', () => {
+    expect(ids({ query: 'creme' })).toEqual([1]);
+    expect(ids({ query: 'creme fraiche' })).toEqual([1]);
+    expect(ids({ query: 'carameliser' })).toEqual([1]);
+  });
+
+  it('finds an accented query in unaccented content', () => {
+    expect(ids({ query: 'crème brulee' })).toEqual([1]);
+  });
+
+  it('finds œufs with oeuf', () => {
+    expect(ids({ query: 'oeuf' })).toEqual([1]);
+    expect(ids({ query: 'œuf' })).toEqual([1]);
+  });
+
+  it('makes the ingredient filter accent-insensitive on both sides', () => {
+    expect(ids({ ingredient: 'creme' })).toEqual([1]);
+    expect(ids({ ingredient: 'Crème Fraîche' })).toEqual([1]);
+    expect(ids({ ingredient: 'oeufs' })).toEqual([1]);
+  });
+});

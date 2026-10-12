@@ -1,6 +1,6 @@
 # recipe-book
 
-A recipe app for two, styled after [Highball](https://www.studioneat.com/blogs/main/17985764-introducing-highball):
+A recipe app for the family, styled after [Highball](https://www.studioneat.com/blogs/main/17985764-introducing-highball):
 a scrollable grid of colorful recipe cards with search and category filtering.
 Anyone can browse; only we can write — via the web UI (Cognito) or a
 bearer-secret import API for automation.

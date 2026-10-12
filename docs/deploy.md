@@ -144,26 +144,26 @@ curl <ApiUrl>/healthz                    # {"ok":true}
 curl <ApiUrl>/api/recipes                # {"recipes":[]}
 ```
 
-### Create the two accounts
+### Create accounts
 
 Sign-in is passkey-first with email codes as bootstrap/recovery, so each
-account needs a verified email and no usable password (the random one below
-only clears Cognito's initial challenge state; the app client has no
-password flow):
+account needs a verified email and no usable password (the script sets a
+random one, which only clears Cognito's initial challenge state; the app
+client has no password flow):
 
 ```sh
-aws cognito-idp admin-create-user \
-  --user-pool-id <UserPoolId> --username <name> \
-  --user-attributes Name=email,Value=<email> Name=email_verified,Value=true \
-  --message-action SUPPRESS
-aws cognito-idp admin-set-user-password \
-  --user-pool-id <UserPoolId> --username <name> \
-  --password "$(openssl rand -base64 24)" --permanent
+npm run add-user -- <name> <email>
 ```
 
-First sign-in on each device: enter the username, choose “Email me a code
-instead”, then accept the “Add a passkey” banner. After that it's Face
-ID/fingerprint only. A lost phone just repeats this bootstrap.
+It reads `USER_POOL_ID` from the environment, or looks it up from the stack
+outputs above, and runs `admin-create-user` (verified email, `--message-action
+SUPPRESS`) then `admin-set-user-password --permanent`. Any later account, say
+a relative joining, is the same command.
+
+The sign-in link is hidden from visitors, so a new person's first sign-in
+goes to `<app url>/#/login`. On each device: enter the username, choose “Email
+me a code instead”, then accept the “Add a passkey” banner. After that it's
+Face ID/fingerprint only. A lost phone just repeats this bootstrap.
 
 ## 3. Web (Amplify Hosting)
 
@@ -205,9 +205,10 @@ dropped, not created.
 - [ ] Create a recipe with a photo — proves JWT, presign, public S3 read
 - [ ] Recipe shows "Added by <account>" attribution
 - [ ] `POST /api/external/recipes` with a wrong secret → 401; right secret → recipe appears
-- [ ] Install the PWA on both phones (Share → Add to Home Screen)
+- [ ] Install the PWA on each phone (Share → Add to Home Screen)
 - [ ] New Recipe → paste recipe text → Extract prefills the form (proves ANTHROPIC_API_KEY)
 - [ ] New Recipe → paste a recipe-site URL → Extract prefills (or picker for several); a Claude share link either extracts or shows the copy-paste guidance
+- [ ] Save a recipe in French, switch the app to English → it reads translated (proves translation)
 
 ## Notes
 

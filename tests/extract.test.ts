@@ -22,6 +22,7 @@ const pancakes = {
   instructions: ["Mix everything.", "Fry in butter."],
   category: "Breakfast",
   credit: null,
+  language: "en" as const,
 };
 
 const one: ExtractionResult = { pageUnreadable: false, recipes: [pancakes] };
@@ -119,6 +120,7 @@ describe("POST /api/extract", () => {
       servings: "4",
       ingredients: ["2 cups flour", "2 eggs"],
       instructions: ["Mix everything.", "Fry in butter."],
+      language: "en",
       categoryId: breakfastId,
       // No URL and no credit in a plain text import → empty attribution.
       notes: "",
@@ -128,6 +130,20 @@ describe("POST /api/extract", () => {
     expect(res.body).toEqual({ recipes: [pancakeOut], ...pancakeOut });
     expect(calls[0].text).toBe("pancake recipe blob");
     expect(calls[0].categoryNames).toEqual(["Breakfast"]);
+  });
+
+  it("passes the detected language through", async () => {
+    const app = createApp({
+      db,
+      extractor: stubExtractor({
+        pageUnreadable: false,
+        recipes: [{ ...pancakes, title: "Crêpes", language: "fr" }],
+      }).extractor,
+    });
+    const res = await request(app).post("/api/extract").send({ text: "des crêpes" });
+    expect(res.status).toBe(200);
+    expect(res.body.recipes[0].language).toBe("fr");
+    expect(res.body.language).toBe("fr");
   });
 
   it("passes a single image through as a one-element array", async () => {
@@ -235,5 +251,10 @@ describe("buildPrompt servings guidance", () => {
 
   it("asks for the recipe's author credit", () => {
     expect(prompt).toMatch(/credit: who the recipe is credited to/);
+  });
+
+  it("asks for the recipe's language, en when neither", () => {
+    expect(prompt).toMatch(/language: the language the recipe is written in/);
+    expect(prompt).toContain('Use "en" when it is neither.');
   });
 });
