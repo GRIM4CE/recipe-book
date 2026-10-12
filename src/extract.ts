@@ -145,7 +145,7 @@ export function createClaudeExtractor(opts: { apiKey: string }): Extractor {
       content.push({ type: "text", text: buildPrompt(input) });
 
       const base = {
-        model: "claude-opus-4-8",
+        model: "claude-haiku-5-5",
         max_tokens: 16000,
         thinking: { type: "adaptive" as const },
         output_config: {
@@ -155,7 +155,7 @@ export function createClaudeExtractor(opts: { apiKey: string }): Extractor {
           ? {
               tools: [
                 {
-                  type: "web_fetch_20260209" as const,
+                  type: "web_fetch_20260318" as const,
                   name: "web_fetch" as const,
                   max_uses: 3,
                   allowed_domains: [new URL(input.url).hostname],
