@@ -13,7 +13,7 @@ import {
 import type { Translator } from "./translate.js";
 import { LANGUAGES, type Language, type Recipe, type RecipeInput } from "./types.js";
 import type { Presigner } from "./uploads.js";
-import type { UserInviter } from "./users.js";
+import type { UserDirectory } from "./users.js";
 
 export interface AppOptions {
   db: Db;
@@ -38,10 +38,11 @@ export interface AppOptions {
   // Translates a recipe into the other language. Absent → translation is
   // disabled (503).
   translator?: Translator | null;
-  // Creates Cognito accounts for new people. Absent → invites are disabled
-  // (503).
-  inviter?: UserInviter | null;
-  // Usernames allowed to invite. Anyone else gets 403 from POST /api/users.
+  // Creates and lists Cognito accounts. Absent → invites and the account list
+  // are disabled (503).
+  directory?: UserDirectory | null;
+  // Usernames allowed to invite and see accounts. Anyone else gets 403 from
+  // /api/users.
   adminUsernames?: string[];
 }
 
@@ -562,6 +563,18 @@ export function createApp(opts: AppOptions) {
     res.json({ username, canInvite: adminUsernames.includes(username) });
   });
 
+  app.get("/api/users", writeAuth, async (_req, res) => {
+    if (!adminUsernames.includes(String(res.locals.username))) {
+      res.status(403).json({ error: "only an admin can see accounts" });
+      return;
+    }
+    if (!opts.directory) {
+      res.status(503).json({ error: "accounts are not configured" });
+      return;
+    }
+    res.json({ users: await opts.directory.list() });
+  });
+
   app.post("/api/users", writeAuth, async (req, res) => {
     // Checked before the 503 so a non-admin never learns whether invites are
     // configured.
@@ -569,7 +582,7 @@ export function createApp(opts: AppOptions) {
       res.status(403).json({ error: "only an admin can invite" });
       return;
     }
-    if (!opts.inviter) {
+    if (!opts.directory) {
       res.status(503).json({ error: "invites are not configured" });
       return;
     }
@@ -578,7 +591,7 @@ export function createApp(opts: AppOptions) {
       res.status(400).json({ error: input });
       return;
     }
-    if ((await opts.inviter.invite(input)) === "exists") {
+    if ((await opts.directory.invite(input)) === "exists") {
       res.status(409).json({ error: "that email already has an account" });
       return;
     }

@@ -8,7 +8,7 @@ import { createApp } from "../src/app.js";
 import type { TokenVerifier } from "../src/auth.js";
 import { createDb, type Db } from "../src/db.js";
 import type { TranslatableFields, Translator } from "../src/translate.js";
-import type { UserInviter } from "../src/users.js";
+import type { UserAccount, UserDirectory } from "../src/users.js";
 
 // Prefixes every string with the target language so tests can see what was
 // translated; records calls, and throws when told to.
@@ -33,17 +33,37 @@ function stubTranslator() {
   return { translator, calls, state };
 }
 
+const stubAccounts: UserAccount[] = [
+  {
+    username: "alice",
+    email: "alice@example.com",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    enabled: true,
+    status: "CONFIRMED",
+  },
+  {
+    username: "cousin@example.com",
+    email: null,
+    createdAt: "2026-02-01T00:00:00.000Z",
+    enabled: false,
+    status: "FORCE_CHANGE_PASSWORD",
+  },
+];
+
 // Records invites instead of calling Cognito; answers "exists" when told to.
-function stubInviter() {
+function stubDirectory() {
   const calls: { username: string; email: string }[] = [];
   const state = { exists: false };
-  const inviter: UserInviter = {
+  const directory: UserDirectory = {
     async invite(input) {
       calls.push(input);
       return state.exists ? "exists" : "created";
     },
+    async list() {
+      return stubAccounts;
+    },
   };
-  return { inviter, calls, state };
+  return { directory, calls, state };
 }
 
 // "<name>-token" signs in as <name>, so a test picks who is calling.
@@ -572,11 +592,11 @@ describe("tags", () => {
 });
 
 describe("invites", () => {
-  const inviteApp = (inviter: UserInviter | null) =>
+  const inviteApp = (directory: UserDirectory | null) =>
     createApp({
       db,
       verifier: namedVerifier,
-      inviter,
+      directory,
       adminUsernames: ["alice"],
     });
   const post = (a: ReturnType<typeof createApp>, as: string, body: object) =>
@@ -593,22 +613,22 @@ describe("invites", () => {
   });
 
   it("turns away a non-admin even when invites are configured", async () => {
-    const { inviter, calls } = stubInviter();
-    const res = await post(inviteApp(inviter), "bob", valid);
+    const { directory, calls } = stubDirectory();
+    const res = await post(inviteApp(directory), "bob", valid);
     expect(res.status).toBe(403);
     expect(res.body.error).toBe("only an admin can invite");
     expect(calls).toEqual([]);
   });
 
-  it("503s for an admin when no inviter is configured", async () => {
+  it("503s for an admin when no directory is configured", async () => {
     const res = await post(inviteApp(null), "alice", valid);
     expect(res.status).toBe(503);
     expect(res.body.error).toBe("invites are not configured");
   });
 
   it("rejects a missing or invalid email", async () => {
-    const { inviter, calls } = stubInviter();
-    const a = inviteApp(inviter);
+    const { directory, calls } = stubDirectory();
+    const a = inviteApp(directory);
     const bodies: object[] = [
       {},
       { username: "cousin" },
@@ -626,35 +646,51 @@ describe("invites", () => {
   });
 
   it("uses the email as the username and answers 201", async () => {
-    const { inviter, calls } = stubInviter();
-    const res = await post(inviteApp(inviter), "alice", valid);
+    const { directory, calls } = stubDirectory();
+    const res = await post(inviteApp(directory), "alice", valid);
     expect(res.status).toBe(201);
     expect(res.body).toEqual({ username: "cousin@example.com", email: "cousin@example.com" });
     expect(calls).toEqual([{ username: "cousin@example.com", email: "cousin@example.com" }]);
   });
 
   it("lowercases the username but passes the email as given", async () => {
-    const { inviter, calls } = stubInviter();
-    const res = await post(inviteApp(inviter), "alice", { email: " Cousin@Example.com " });
+    const { directory, calls } = stubDirectory();
+    const res = await post(inviteApp(directory), "alice", { email: " Cousin@Example.com " });
     expect(res.status).toBe(201);
     expect(res.body).toEqual({ username: "cousin@example.com", email: "Cousin@Example.com" });
     expect(calls).toEqual([{ username: "cousin@example.com", email: "Cousin@Example.com" }]);
   });
 
   it("ignores a username in the body", async () => {
-    const { inviter, calls } = stubInviter();
-    const res = await post(inviteApp(inviter), "alice", { ...valid, username: "someone-else" });
+    const { directory, calls } = stubDirectory();
+    const res = await post(inviteApp(directory), "alice", { ...valid, username: "someone-else" });
     expect(res.status).toBe(201);
     expect(res.body.username).toBe("cousin@example.com");
     expect(calls).toEqual([{ username: "cousin@example.com", email: "cousin@example.com" }]);
   });
 
   it("409s when the email already has an account", async () => {
-    const { inviter, state } = stubInviter();
+    const { directory, state } = stubDirectory();
     state.exists = true;
-    const res = await post(inviteApp(inviter), "alice", valid);
+    const res = await post(inviteApp(directory), "alice", valid);
     expect(res.status).toBe(409);
     expect(res.body.error).toBe("that email already has an account");
+  });
+
+  it("lists accounts for an admin only", async () => {
+    const { directory } = stubDirectory();
+    const get = (a: ReturnType<typeof createApp>, as: string) =>
+      request(a).get("/api/users").set("Authorization", `Bearer ${as}-token`);
+    const forbidden = await get(inviteApp(directory), "bob");
+    expect(forbidden.status).toBe(403);
+    expect(forbidden.body.error).toBe("only an admin can see accounts");
+    const missing = await get(inviteApp(null), "alice");
+    expect(missing.status).toBe(503);
+    expect(missing.body.error).toBe("accounts are not configured");
+    const ok = await get(inviteApp(directory), "alice");
+    expect(ok.status).toBe(200);
+    expect(ok.body).toEqual({ users: stubAccounts });
+    expect((await request(inviteApp(directory)).get("/api/users")).status).toBe(401);
   });
 });
 

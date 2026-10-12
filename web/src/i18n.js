@@ -129,6 +129,9 @@ export const STRINGS = {
     // Settings
     signedInAs: 'Signed in as',
     signOut: 'Sign out',
+    peopleTitle: 'People with access',
+    joined: 'Added {date}',
+    disabled: 'Disabled',
     inviteTitle: 'Invite someone',
     inviteHint: 'Enter their email. They’ll sign in with it.',
     email: 'Email',
@@ -255,6 +258,9 @@ export const STRINGS = {
 
     signedInAs: 'Connecté en tant que',
     signOut: 'Se déconnecter',
+    peopleTitle: 'Qui a accès',
+    joined: 'Ajouté·e le {date}',
+    disabled: 'Désactivé',
     inviteTitle: 'Inviter quelqu’un',
     inviteHint: 'Saisissez leur e-mail. Ils se connecteront avec.',
     email: 'E-mail',

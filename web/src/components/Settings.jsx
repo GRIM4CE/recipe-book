@@ -3,7 +3,7 @@ import { api } from '../api.js';
 import { useLanguage } from '../useLanguage.jsx';
 import LanguageSwitch from './LanguageSwitch.jsx';
 
-function Invite() {
+function Invite({ onInvited }) {
   const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -17,6 +17,7 @@ function Invite() {
     setError(null);
     try {
       setInvited(await api.inviteUser({ email: email.trim() }));
+      onInvited();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -88,16 +89,53 @@ function Invite() {
   );
 }
 
+function People({ users }) {
+  const { lang, t } = useLanguage();
+  const dateFormat = new Intl.DateTimeFormat(lang === 'fr' ? 'fr-FR' : 'en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  return (
+    <div className="settings-section">
+      <p className="settings-label">{t('peopleTitle')}</p>
+      <ul className="people-list">
+        {users.map((u) => (
+          <li key={u.username}>
+            <span>{u.email ?? u.username}</span>
+            <span className="hint">
+              {t('joined', { date: dateFormat.format(new Date(u.createdAt)) })}
+              {!u.enabled && ` · ${t('disabled')}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function Settings({ user, onSignOut }) {
   const { t } = useLanguage();
   const [canInvite, setCanInvite] = useState(false);
+  const [users, setUsers] = useState([]);
 
-  // A failed lookup just leaves the invite section out.
+  // A failed lookup just leaves the admin sections out.
+  const loadUsers = () =>
+    api
+      .listUsers()
+      .then((res) => setUsers(res.users))
+      .catch(() => {});
+
   useEffect(() => {
     let live = true;
     api
       .me()
-      .then((me) => live && setCanInvite(Boolean(me.canInvite)))
+      .then((me) => {
+        if (!live) return;
+        setCanInvite(Boolean(me.canInvite));
+        if (me.canInvite) loadUsers();
+      })
       .catch(() => {});
     return () => {
       live = false;
@@ -115,7 +153,8 @@ export default function Settings({ user, onSignOut }) {
         <p className="settings-label">{t('language')}</p>
         <LanguageSwitch />
       </div>
-      {canInvite && <Invite />}
+      {canInvite && users.length > 0 && <People users={users} />}
+      {canInvite && <Invite onInvited={loadUsers} />}
       <button className="btn danger" type="button" onClick={onSignOut}>
         {t('signOut')}
       </button>

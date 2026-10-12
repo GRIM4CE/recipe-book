@@ -10,7 +10,7 @@ import { createDb } from "./db.js";
 import { createClaudeExtractor } from "./extract.js";
 import { createClaudeTranslator } from "./translate.js";
 import { createS3Presigner } from "./uploads.js";
-import { createCognitoInviter } from "./users.js";
+import { createCognitoDirectory } from "./users.js";
 
 const config = loadConfig();
 const client = createClient({
@@ -43,8 +43,8 @@ const app = createApp({
     ? createClaudeTranslator({ apiKey: config.anthropicApiKey })
     : null,
   adminUsernames: config.adminUsernames,
-  inviter: config.authEnabled
-    ? createCognitoInviter({
+  directory: config.authEnabled
+    ? createCognitoDirectory({
         userPoolId: config.cognitoUserPoolId,
         region: config.cognitoRegion,
       })
