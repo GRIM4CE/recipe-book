@@ -3,6 +3,7 @@ import { api } from './api.js';
 import { currentUser, devMode, hasDevicePasskey, logout, registerPasskey } from './auth.js';
 import { localizeRecipe, recipeLanguage } from './i18n.js';
 import Categories from './components/Categories.jsx';
+import ChooseUsername from './components/ChooseUsername.jsx';
 import Login from './components/Login.jsx';
 import RecipeDetail from './components/RecipeDetail.jsx';
 import RecipeForm from './components/RecipeForm.jsx';
@@ -28,6 +29,9 @@ export default function App() {
   const { lang, t } = useLanguage();
   const route = useHashRoute();
   const [user, setUser] = useState(currentUser);
+  // Who the API says is signed in: their chosen username, and whether they
+  // still have to pick one. Null while signed out or until it loads.
+  const [me, setMe] = useState(null);
   const [offerPasskey, setOfferPasskey] = useState(false);
   const [recipes, setRecipes] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -68,8 +72,28 @@ export default function App() {
   }, [reload]);
 
   useEffect(() => {
+    if (!user) {
+      setMe(null);
+      return;
+    }
+    let live = true;
+    api
+      .me()
+      .then((m) => live && setMe(m))
+      .catch(() => live && setMe(null));
+    return () => {
+      live = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
     setOfferPasskey(Boolean(user) && !devMode && !hasDevicePasskey());
   }, [user]);
+
+  async function saveUsername(username) {
+    await api.setUsername(username);
+    setMe(await api.me());
+  }
 
   async function addPasskey() {
     try {
@@ -173,8 +197,12 @@ export default function App() {
   const editMatch = route.match(/^\/recipes\/(\d+)\/edit$/);
   const findRecipe = (id, list = recipes) => list?.find((r) => r.id === Number(id));
 
+  const choosingUsername = Boolean(me?.needsUsername) && route !== '/login';
+
   let page;
-  if (error) {
+  if (choosingUsername) {
+    page = <ChooseUsername onSave={saveUsername} />;
+  } else if (error) {
     page = <p className="notice">{t('loadError', { error })}</p>;
   } else if (route === '/login') {
     page = <Login onLogin={setUser} />;
@@ -215,7 +243,7 @@ export default function App() {
     );
   } else if (route === '/settings') {
     page = user ? (
-      <Settings user={user} onSignOut={signOut} />
+      <Settings user={user} me={me} onSignOut={signOut} />
     ) : (
       <Login onLogin={setUser} />
     );
@@ -251,7 +279,7 @@ export default function App() {
 
   // A recipe fills the screen on its own: no wordmark, no nav, just the card
   // and its own back button.
-  const bare = Boolean(detailMatch) && !error;
+  const bare = Boolean(detailMatch) && !error && !choosingUsername;
 
   return (
     <div className={bare ? 'app bare' : 'app'}>

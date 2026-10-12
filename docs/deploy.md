@@ -154,10 +154,11 @@ password flow).
 
 Set `ADMIN_USERNAMES` to your username (then deploy once), sign in, open
 Settings → Invite someone, enter just their email; their sign-in name is that
-email (lowercased), and the page offers to send them the instructions. Your
-own account, the first one, has to come from the CLI below, since nobody can
-invite before an admin exists. Settings also lists everyone who has an
-account.
+email (lowercased), and the page offers to send them the instructions. On
+first sign-in each person picks a username, which is what recipes and the
+People list show; sign-in stays by email. Your own account, the first one,
+has to come from the CLI below, since nobody can invite before an admin
+exists. Settings also lists everyone who has an account.
 
 The CLI alternative is `npm run add-user -- <name> <email>`; pass the email
 for both (`npm run add-user -- <email> <email>`) to get the same result as the

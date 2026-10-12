@@ -62,13 +62,16 @@ Resources:
       Policies:
         - S3WritePolicy:
             BucketName: !Ref PhotosBucket
-        # Invites from the app create accounts the way scripts/add-user.sh does, and
-        # Settings lists them.
+        # Invites from the app create accounts the way scripts/add-user.sh does,
+        # Settings lists them, and each person's chosen username is read and
+        # written as their preferred_username attribute.
         - Statement:
             - Effect: Allow
               Action:
                 - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminGetUser
                 - cognito-idp:AdminSetUserPassword
+                - cognito-idp:AdminUpdateUserAttributes
                 - cognito-idp:ListUsers
               Resource: !GetAtt UserPool.Arn
     Metadata:

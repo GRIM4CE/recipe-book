@@ -37,6 +37,7 @@ const stubAccounts: UserAccount[] = [
   {
     username: "alice",
     email: "alice@example.com",
+    displayName: "Alice",
     createdAt: "2026-01-01T00:00:00.000Z",
     enabled: true,
     status: "CONFIRMED",
@@ -44,26 +45,37 @@ const stubAccounts: UserAccount[] = [
   {
     username: "cousin@example.com",
     email: null,
+    displayName: null,
     createdAt: "2026-02-01T00:00:00.000Z",
     enabled: false,
     status: "FORCE_CHANGE_PASSWORD",
   },
 ];
 
-// Records invites instead of calling Cognito; answers "exists" when told to.
+// Records invites and chosen names instead of calling Cognito; answers
+// "exists" or "taken" when told to, and reports state.displayName as the
+// signed-in person's chosen name.
 function stubDirectory() {
   const calls: { username: string; email: string }[] = [];
-  const state = { exists: false };
+  const nameCalls: { username: string; displayName: string }[] = [];
+  const state = { exists: false, taken: false, displayName: null as string | null };
   const directory: UserDirectory = {
     async invite(input) {
       calls.push(input);
       return state.exists ? "exists" : "created";
     },
+    async getProfile() {
+      return { displayName: state.displayName };
+    },
+    async setDisplayName(username, displayName) {
+      nameCalls.push({ username, displayName });
+      return state.taken ? "taken" : "set";
+    },
     async list() {
       return stubAccounts;
     },
   };
-  return { directory, calls, state };
+  return { directory, calls, nameCalls, state };
 }
 
 // "<name>-token" signs in as <name>, so a test picks who is calling.
@@ -606,9 +618,19 @@ describe("invites", () => {
   it("reports who is signed in and whether they can invite", async () => {
     const a = inviteApp(null);
     const admin = await request(a).get("/api/me").set("Authorization", "Bearer alice-token");
-    expect(admin.body).toEqual({ username: "alice", canInvite: true });
+    expect(admin.body).toEqual({
+      username: "alice",
+      displayName: "alice",
+      canInvite: true,
+      needsUsername: false,
+    });
     const other = await request(a).get("/api/me").set("Authorization", "Bearer bob-token");
-    expect(other.body).toEqual({ username: "bob", canInvite: false });
+    expect(other.body).toEqual({
+      username: "bob",
+      displayName: "bob",
+      canInvite: false,
+      needsUsername: false,
+    });
     expect((await request(a).get("/api/me")).status).toBe(401);
   });
 
@@ -690,7 +712,133 @@ describe("invites", () => {
     const ok = await get(inviteApp(directory), "alice");
     expect(ok.status).toBe(200);
     expect(ok.body).toEqual({ users: stubAccounts });
+    expect(ok.body.users.map((u: UserAccount) => u.displayName)).toEqual(["Alice", null]);
     expect((await request(inviteApp(directory)).get("/api/users")).status).toBe(401);
+  });
+});
+
+describe("usernames", () => {
+  const nameApp = (directory: UserDirectory | null) =>
+    createApp({ db, verifier: namedVerifier, directory });
+  const me = (a: ReturnType<typeof createApp>) =>
+    request(a).get("/api/me").set("Authorization", "Bearer cousin-token");
+  const choose = (a: ReturnType<typeof createApp>, body: object) =>
+    request(a).post("/api/me/username").set("Authorization", "Bearer cousin-token").send(body);
+
+  it("asks for a username until one is chosen", async () => {
+    const { directory, state } = stubDirectory();
+    const a = nameApp(directory);
+    expect((await me(a)).body).toEqual({
+      username: "cousin",
+      displayName: null,
+      canInvite: false,
+      needsUsername: true,
+    });
+    state.displayName = "Cuz";
+    expect((await me(a)).body).toEqual({
+      username: "cousin",
+      displayName: "Cuz",
+      canInvite: false,
+      needsUsername: false,
+    });
+  });
+
+  it("never asks without a directory", async () => {
+    const res = await me(nameApp(null));
+    expect(res.body.needsUsername).toBe(false);
+    expect(res.body.displayName).toBe("cousin");
+  });
+
+  it("rejects names that are too short, too long or use other characters", async () => {
+    const { directory, nameCalls } = stubDirectory();
+    const a = nameApp(directory);
+    const bad = [
+      "a",
+      "a".repeat(33),
+      "two words",
+      'say "hi"',
+      ".dot-first",
+      "-dash-first",
+      "émile",
+      "",
+    ];
+    for (const username of bad) {
+      const res = await choose(a, { username });
+      expect(res.status, username).toBe(400);
+      expect(res.body.error).toBe(
+        "username must be 2–32 letters, numbers, dots, dashes or underscores",
+      );
+    }
+    expect((await choose(a, {})).status).toBe(400);
+    expect((await choose(a, { username: 5 })).status).toBe(400);
+    expect(nameCalls).toEqual([]);
+  });
+
+  it("accepts the length limits and allowed punctuation", async () => {
+    const { directory, nameCalls } = stubDirectory();
+    const a = nameApp(directory);
+    for (const username of ["ab", "a".repeat(32), "Mary.Jane_2-b"]) {
+      const res = await choose(a, { username });
+      expect(res.status, username).toBe(200);
+      expect(res.body).toEqual({ displayName: username });
+    }
+    expect(nameCalls).toHaveLength(3);
+  });
+
+  it("409s when someone else has the name", async () => {
+    const { directory, state } = stubDirectory();
+    state.taken = true;
+    const res = await choose(nameApp(directory), { username: "alice" });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe("that username is taken");
+  });
+
+  it("passes the sign-in name and the chosen name to the directory", async () => {
+    const { directory, nameCalls } = stubDirectory();
+    const res = await choose(nameApp(directory), { username: "cuz" });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ displayName: "cuz" });
+    expect(nameCalls).toEqual([{ username: "cousin", displayName: "cuz" }]);
+  });
+
+  it("503s without a directory and 401s without a token", async () => {
+    const res = await choose(nameApp(null), { username: "cuz" });
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe("accounts are not configured");
+    const { directory } = stubDirectory();
+    expect(
+      (await request(nameApp(directory)).post("/api/me/username").send({ username: "cuz" })).status,
+    ).toBe(401);
+  });
+
+  it("signs new and duplicated recipes with the chosen name", async () => {
+    const { directory, state } = stubDirectory();
+    state.displayName = "Cuz";
+    const a = nameApp(directory);
+    const created = await request(a)
+      .post("/api/recipes")
+      .set("Authorization", "Bearer cousin-token")
+      .send({ title: "Signed Soup" });
+    expect(created.status).toBe(201);
+    expect(created.body.createdBy).toBe("Cuz");
+    state.displayName = "Cuz II";
+    const copy = await request(a)
+      .post(`/api/recipes/${created.body.id}/duplicate`)
+      .set("Authorization", "Bearer cousin-token");
+    expect(copy.status).toBe(201);
+    expect(copy.body.createdBy).toBe("Cuz II");
+  });
+
+  it("signs with the sign-in name until one is chosen, and as dev locally", async () => {
+    const { directory } = stubDirectory();
+    const created = await request(nameApp(directory))
+      .post("/api/recipes")
+      .set("Authorization", "Bearer cousin-token")
+      .send({ title: "Unsigned Soup" });
+    expect(created.body.createdBy).toBe("cousin");
+    const local = await request(app).post("/api/recipes").send({ title: "Local Soup" });
+    expect(local.body.createdBy).toBe("dev");
+    expect((await request(app).get("/api/me")).body.needsUsername).toBe(false);
   });
 });
 
