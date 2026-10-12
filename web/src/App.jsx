@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import { currentUser, devMode, hasDevicePasskey, logout, registerPasskey } from './auth.js';
+import { localizeRecipe } from './i18n.js';
 import Categories from './components/Categories.jsx';
+import LanguageSwitch from './components/LanguageSwitch.jsx';
 import Login from './components/Login.jsx';
 import RecipeDetail from './components/RecipeDetail.jsx';
 import RecipeForm from './components/RecipeForm.jsx';
 import RecipeGrid from './components/RecipeGrid.jsx';
 import Settings from './components/Settings.jsx';
 import TagManager from './components/TagManager.jsx';
+import { useLanguage } from './useLanguage.jsx';
 
 // Hash routing keeps the SPA deployable without rewrite rules: the path after
 // '#' is the route, e.g. #/recipes/12.
@@ -23,6 +26,7 @@ export function useHashRoute() {
 }
 
 export default function App() {
+  const { lang, t } = useLanguage();
   const route = useHashRoute();
   const [user, setUser] = useState(currentUser);
   const [offerPasskey, setOfferPasskey] = useState(false);
@@ -71,9 +75,25 @@ export default function App() {
     }
   }
 
+  // Translating takes a few seconds, so saving doesn't wait for it: the
+  // translated text shows up on the next reload. Failures are fine (translation
+  // may not be configured); the Translate button on the recipe retries.
   function onSaved(recipe) {
     reload();
     window.location.hash = `#/recipes/${recipe.id}`;
+    api
+      .translateRecipe(recipe.id)
+      .then(() => reload())
+      .catch(() => {});
+  }
+
+  async function onTranslateRecipe(recipe) {
+    try {
+      await api.translateRecipe(recipe.id);
+      await reload();
+    } catch (err) {
+      window.alert(err.message);
+    }
   }
 
   // Lands on the copy's edit form: duplicating is how you start a variation,
@@ -111,21 +131,25 @@ export default function App() {
   const showSignIn =
     devMode || hasDevicePasskey() || window.matchMedia('(display-mode: standalone)').matches;
 
-  const tagSuggestions = [...new Set((recipes ?? []).flatMap((r) => r.tags ?? []))].sort(
+  // What readers see: each recipe in the current language. The form edits the
+  // untouched `recipes` instead, so a translation is never saved as the source.
+  const shown = recipes?.map((r) => localizeRecipe(r, lang));
+
+  const tagSuggestions = [...new Set((shown ?? []).flatMap((r) => r.tags ?? []))].sort(
     (a, b) => a.localeCompare(b),
   );
 
   const detailMatch = route.match(/^\/recipes\/(\d+)$/);
   const editMatch = route.match(/^\/recipes\/(\d+)\/edit$/);
-  const findRecipe = (id) => recipes?.find((r) => r.id === Number(id));
+  const findRecipe = (id, list = recipes) => list?.find((r) => r.id === Number(id));
 
   let page;
   if (error) {
-    page = <p className="notice">Couldn’t load recipes: {error}</p>;
+    page = <p className="notice">{t('loadError', { error })}</p>;
   } else if (route === '/login') {
     page = <Login onLogin={setUser} />;
   } else if (recipes === null) {
-    page = <p className="notice">Loading…</p>;
+    page = <p className="notice">{t('loading')}</p>;
   } else if (route === '/new') {
     page = user ? (
       <RecipeForm categories={categories} tagSuggestions={tagSuggestions} onSaved={onSaved} />
@@ -145,7 +169,7 @@ export default function App() {
         onDelete={onDeleteRecipe}
       />
     ) : (
-      <p className="notice">That recipe doesn’t exist (anymore).</p>
+      <p className="notice">{t('recipeMissing')}</p>
     );
   } else if (route === '/categories') {
     page = user ? (
@@ -166,21 +190,22 @@ export default function App() {
       <Login onLogin={setUser} />
     );
   } else if (detailMatch) {
-    const recipe = findRecipe(detailMatch[1]);
+    const recipe = findRecipe(detailMatch[1], shown);
     page = recipe ? (
       <RecipeDetail
         recipe={recipe}
-        recipes={recipes}
+        recipes={shown}
         canEdit={Boolean(user)}
         onDuplicate={onDuplicateRecipe}
+        onTranslate={onTranslateRecipe}
       />
     ) : (
-      <p className="notice">That recipe doesn’t exist (anymore).</p>
+      <p className="notice">{t('recipeMissing')}</p>
     );
   } else {
     page = (
       <RecipeGrid
-        recipes={recipes}
+        recipes={shown}
         categories={categories}
         filters={filters}
         onFilters={setFilters}
@@ -197,21 +222,22 @@ export default function App() {
     <div className={bare ? 'app bare' : 'app'}>
       {!bare && (
         <header className="header">
-          <a href="#/" className="wordmark">Recipe Book</a>
+          <a href="#/" className="wordmark">{t('appName')}</a>
           <nav className="nav">
+            <LanguageSwitch />
             {user ? (
               <>
-                <a className="btn primary small" href="#/new">+ Recipe</a>
-                <a className="btn ghost small" href="#/categories">Categories</a>
-                <a className="btn ghost small" href="#/tags">Tags</a>
-                <a className="icon-btn" href="#/settings" aria-label="Settings" title="Settings">
+                <a className="btn primary small" href="#/new">{t('newRecipe')}</a>
+                <a className="btn ghost small" href="#/categories">{t('categories')}</a>
+                <a className="btn ghost small" href="#/tags">{t('tags')}</a>
+                <a className="icon-btn" href="#/settings" aria-label={t('settings')} title={t('settings')}>
                   <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
                     <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
                   </svg>
                 </a>
               </>
             ) : showSignIn ? (
-              <a className="btn ghost small" href="#/login">Sign in</a>
+              <a className="btn ghost small" href="#/login">{t('signIn')}</a>
             ) : null}
           </nav>
         </header>
@@ -219,12 +245,12 @@ export default function App() {
       <main>
         {offerPasskey && (
           <p className="notice">
-            Add a passkey to sign in with just Face ID / fingerprint next time.{' '}
+            {t('passkeyOffer')}{' '}
             <button className="btn primary small" type="button" onClick={addPasskey}>
-              Add passkey
+              {t('addPasskey')}
             </button>{' '}
             <button className="btn ghost small" type="button" onClick={() => setOfferPasskey(false)}>
-              Not now
+              {t('notNow')}
             </button>
           </p>
         )}

@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { api } from '../api.js';
 import { blobToBase64, downscaleToJpeg } from '../image.js';
 import { describeImportError } from '../importError.js';
+import { LANGUAGES, LANGUAGE_NAMES } from '../i18n.js';
+import { useLanguage } from '../useLanguage.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
 const lines = (text) =>
   text
@@ -11,9 +13,11 @@ const lines = (text) =>
 
 // One line per ingredient/step: far friendlier on a phone than dynamic rows.
 export default function RecipeForm({ recipe, categories, tagSuggestions = [], onSaved, onDelete }) {
+  const { lang, t } = useLanguage();
   const [title, setTitle] = useState(recipe?.title ?? '');
   const [summary, setSummary] = useState(recipe?.summary ?? '');
   const [servings, setServings] = useState(recipe?.servings ?? '');
+  const [language, setLanguage] = useState(recipe?.language ?? lang);
   const [categoryId, setCategoryId] = useState(recipe?.category?.id ?? '');
   const [tags, setTags] = useState(recipe?.tags ?? []);
   const [tagInput, setTagInput] = useState('');
@@ -66,6 +70,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
     setTitle(r.title);
     setSummary(r.summary);
     setServings(r.servings ?? '');
+    if (LANGUAGES.includes(r.language)) setLanguage(r.language);
     setCategoryId(r.categoryId ?? '');
     setIngredients(r.ingredients.join('\n'));
     setInstructions(r.instructions.join('\n'));
@@ -84,7 +89,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
       if (recipes.length === 1) applyRecipe(recipes[0]);
       else setFoundRecipes(recipes);
     } catch (err) {
-      setImportError(describeImportError(err));
+      setImportError(describeImportError(err, t));
     } finally {
       setImporting(null);
     }
@@ -95,7 +100,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
     if (files.length === 0) return;
     e.target.value = '';
     const status =
-      files.length === 1 ? 'Reading your photo…' : `Reading ${files.length} photos…`;
+      files.length === 1 ? t('readingPhoto') : t('readingPhotos', { n: files.length });
     setImporting(status);
     setImportError(null);
     try {
@@ -105,7 +110,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
       );
       await runImport({ images, mediaType: 'image/jpeg' }, status);
     } catch (err) {
-      setImportError(describeImportError(err));
+      setImportError(describeImportError(err, t));
       setImporting(null);
     }
   }
@@ -150,6 +155,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
         title,
         summary,
         servings: servings.trim(),
+        language,
         categoryId: categoryId === '' ? null : Number(categoryId),
         tags: savedTags,
         ingredients: lines(ingredients),
@@ -169,12 +175,12 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
 
   return (
     <form className="form" onSubmit={submit}>
-      <h2>{recipe ? 'Edit recipe' : 'New recipe'}</h2>
+      <h2>{recipe ? t('editRecipe') : t('newRecipeTitle')}</h2>
       {!recipe &&
         (foundRecipes ? (
           <div className="import-panel">
             <span className="field-title">
-              Found {foundRecipes.length} recipes — pick one
+              {t('importFound', { n: foundRecipes.length })}
             </span>
             {foundRecipes.map((r, i) => (
               <button
@@ -192,50 +198,50 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
                 type="button"
                 onClick={() => setFoundRecipes(null)}
               >
-                Back
+                {t('back')}
               </button>
             </div>
           </div>
         ) : showImport ? (
           <div className="import-panel">
-            <span className="field-title">Import from a URL, text, or photo</span>
+            <span className="field-title">{t('importTitle')}</span>
             <div className="import-url-row">
               <input
                 type="url"
                 value={importUrl}
                 onChange={(e) => setImportUrl(e.target.value)}
-                placeholder="Link to a recipe page or Claude chat"
+                placeholder={t('importUrlPlaceholder')}
                 disabled={!!importing}
               />
               <button
                 className="btn ghost small"
                 type="button"
                 onClick={() =>
-                  runImport({ url: importUrl.trim() }, 'Reading the page…')
+                  runImport({ url: importUrl.trim() }, t('readingPage'))
                 }
                 disabled={!!importing || !importUrl.trim()}
               >
-                Extract from URL
+                {t('extractUrl')}
               </button>
             </div>
             <textarea
               rows={4}
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
-              placeholder="…or paste recipe text here"
+              placeholder={t('importTextPlaceholder')}
               disabled={!!importing}
             />
             <div className="form-actions import-actions">
               <button
                 className="btn ghost small"
                 type="button"
-                onClick={() => runImport({ text: importText }, 'Reading your text…')}
+                onClick={() => runImport({ text: importText }, t('readingText'))}
                 disabled={!!importing || !importText.trim()}
               >
-                Extract from text
+                {t('extractText')}
               </button>
               <label className="btn ghost small">
-                Extract from photos
+                {t('extractPhotos')}
                 <input
                   type="file"
                   accept="image/*"
@@ -251,7 +257,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
                 <span className="spinner" aria-hidden="true" />
                 <span>
                   {importing}{' '}
-                  <span className="hint-inline">this can take up to a minute</span>
+                  <span className="hint-inline">{t('importWait')}</span>
                 </span>
               </p>
             )}
@@ -267,33 +273,43 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
             type="button"
             onClick={() => setShowImport(true)}
           >
-            Import from a URL, text, or photo
+            {t('importTitle')}
           </button>
         ))}
       <label>
-        Title
+        {t('title')}
         <input value={title} onChange={(e) => setTitle(e.target.value)} required />
       </label>
       <label>
-        Summary
+        {t('summary')}
         <input
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          placeholder="One line about this recipe"
+          placeholder={t('summaryPlaceholder')}
         />
       </label>
       <label>
-        Servings
+        {t('servings')}
         <input
           value={servings}
           onChange={(e) => setServings(e.target.value)}
-          placeholder="e.g. 4"
+          placeholder={t('servingsPlaceholder')}
         />
       </label>
       <label>
-        Category
+        {t('language')}
+        <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+          {LANGUAGES.map((code) => (
+            <option key={code} value={code}>
+              {LANGUAGE_NAMES[code]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        {t('category')}
         <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-          <option value="">None</option>
+          <option value="">{t('none')}</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -305,16 +321,16 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
           stray clicks to the first chip's remove button. */}
       <div className="tag-field">
         <span className="field-title">
-          Tags <span className="hint-inline">press Enter after each</span>
+          {t('tags')} <span className="hint-inline">{t('tagsHint')}</span>
         </span>
         <div className="tag-editor">
-          {tags.map((t) => (
-            <span key={t} className="tag">
-              {t}
+          {tags.map((tag) => (
+            <span key={tag} className="tag">
+              {tag}
               <button
                 type="button"
-                aria-label={`Remove tag ${t}`}
-                onClick={() => setTags(tags.filter((x) => x !== t))}
+                aria-label={t('removeTag', { tag })}
+                onClick={() => setTags(tags.filter((x) => x !== tag))}
               >
                 ×
               </button>
@@ -324,7 +340,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={onTagKeyDown}
-            placeholder={tags.length === 0 ? 'e.g. Wing Sauces' : ''}
+            placeholder={tags.length === 0 ? t('tagPlaceholder') : ''}
           />
         </div>
         {unusedSuggestions.length > 0 && (
@@ -343,45 +359,45 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
         )}
       </div>
       <div className="photo-field">
-        <span className="field-title">Photo</span>
+        <span className="field-title">{t('photo')}</span>
         {photoPreview && <img className="photo-preview" src={photoPreview} alt="" />}
         <div className="form-actions photo-actions">
           <label className="btn ghost small">
-            {photoPreview ? 'Replace photo' : 'Add photo'}
+            {photoPreview ? t('replacePhoto') : t('addPhoto')}
             <input type="file" accept="image/*" onChange={pickPhoto} hidden />
           </label>
           {photoPreview && (
             <button className="btn danger small" type="button" onClick={removePhoto}>
-              Remove
+              {t('remove')}
             </button>
           )}
         </div>
       </div>
       <label>
-        Ingredients <span className="hint-inline">one per line</span>
+        {t('ingredients')} <span className="hint-inline">{t('onePerLine')}</span>
         <textarea
           rows={8}
           value={ingredients}
           onChange={(e) => setIngredients(e.target.value)}
-          placeholder={'2 cups flour\n2 eggs'}
+          placeholder={t('ingredientsPlaceholder')}
         />
       </label>
       <label>
-        Instructions <span className="hint-inline">one step per line</span>
+        {t('instructions')} <span className="hint-inline">{t('onePerStep')}</span>
         <textarea
           rows={8}
           value={instructions}
           onChange={(e) => setInstructions(e.target.value)}
-          placeholder={'Mix everything.\nBake at 375°F.'}
+          placeholder={t('instructionsPlaceholder')}
         />
       </label>
       <label>
-        Notes <span className="hint-inline">tips, substitutions, anything</span>
+        {t('notes')} <span className="hint-inline">{t('notesHint')}</span>
         <textarea
           rows={4}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="e.g. Doubles well. Swap butter for oil to make it dairy-free."
+          placeholder={t('notesPlaceholder')}
         />
       </label>
       {error && <p className="error">{error}</p>}
@@ -392,21 +408,20 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
             type="button"
             onClick={() => setConfirmingDelete(true)}
           >
-            Delete
+            {t('delete')}
           </button>
         )}
         <a className="btn ghost" href={recipe ? `#/recipes/${recipe.id}` : '#/'}>
-          Cancel
+          {t('cancel')}
         </a>
         <button className="btn primary" type="submit" disabled={busy || !!importing}>
-          {busy ? 'Saving…' : 'Save recipe'}
+          {busy ? t('saving') : t('saveRecipe')}
         </button>
       </div>
       <ConfirmDialog
         open={confirmingDelete}
-        title={`Delete “${recipe?.title}”?`}
-        message="This can’t be undone."
-        confirmLabel="Delete"
+        title={t('deleteTitle', { title: recipe?.title })}
+        message={t('deleteMessage')}
         onConfirm={() => {
           setConfirmingDelete(false);
           onDelete(recipe);

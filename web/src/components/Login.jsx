@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { devMode, loginWithPasskey, requestEmailCode, submitEmailCode } from '../auth.js';
+import { useLanguage } from '../useLanguage.jsx';
 
 export default function Login({ onLogin }) {
+  const { t } = useLanguage();
   const [username, setUsername] = useState('');
   const [mode, setMode] = useState('passkey'); // 'passkey' | 'email' | 'code'
   const [code, setCode] = useState('');
@@ -43,12 +45,10 @@ export default function Login({ onLogin }) {
 
   return (
     <form className="form login-form" onSubmit={submit}>
-      <h2>Sign in</h2>
-      {devMode && (
-        <p className="hint">Dev mode: any name signs you in, writes run as “dev”.</p>
-      )}
+      <h2>{t('signIn')}</h2>
+      {devMode && <p className="hint">{t('devHint')}</p>}
       <label>
-        Username
+        {t('username')}
         <input
           value={username}
           onChange={(e) => setUsername(e.target.value)}
@@ -59,7 +59,7 @@ export default function Login({ onLogin }) {
       </label>
       {mode === 'code' && (
         <label>
-          Code from your email
+          {t('emailCode')}
           <input
             value={code}
             onChange={(e) => setCode(e.target.value)}
@@ -72,12 +72,12 @@ export default function Login({ onLogin }) {
       {error && <p className="error">{error}</p>}
       <button className="btn primary" type="submit" disabled={busy}>
         {busy
-          ? 'Signing in…'
+          ? t('signingIn')
           : mode === 'passkey'
-            ? 'Sign in with passkey'
+            ? t('signInPasskey')
             : mode === 'email'
-              ? 'Email me a code'
-              : 'Sign in'}
+              ? t('emailMeCode')
+              : t('signIn')}
       </button>
       {!devMode && mode === 'passkey' && (
         <button
@@ -88,7 +88,7 @@ export default function Login({ onLogin }) {
             setError(null);
           }}
         >
-          Email me a code instead
+          {t('emailMeCodeInstead')}
         </button>
       )}
       {mode === 'code' && (
@@ -101,7 +101,7 @@ export default function Login({ onLogin }) {
             setError(null);
           }}
         >
-          Send a new code
+          {t('sendNewCode')}
         </button>
       )}
     </form>

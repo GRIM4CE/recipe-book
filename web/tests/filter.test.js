@@ -154,6 +154,39 @@ describe('fuzzy and synonym search', () => {
   });
 });
 
+describe('filterRecipes across languages', () => {
+  const gratin = {
+    id: 1,
+    language: 'fr',
+    title: 'Gratin dauphinois',
+    summary: '',
+    ingredients: ['pommes de terre', 'crème'],
+    instructions: ['Cuire au four.'],
+    translations: {
+      en: {
+        title: 'Potato gratin',
+        summary: '',
+        ingredients: ['potatoes', 'cream'],
+        instructions: ['Bake in the oven.'],
+      },
+    },
+  };
+
+  it('finds a recipe through its translation', () => {
+    expect(filterRecipes([gratin], { query: 'potatoes' })).toHaveLength(1);
+    expect(filterRecipes([gratin], { query: 'pommes' })).toHaveLength(1);
+  });
+
+  it('still finds the source text when the list is shown translated', () => {
+    const shown = { ...gratin, title: 'Potato gratin', original: gratin };
+    expect(filterRecipes([shown], { query: 'dauphinois' })).toHaveLength(1);
+  });
+
+  it('does not match words found in no version', () => {
+    expect(filterRecipes([gratin], { query: 'bourbon' })).toHaveLength(0);
+  });
+});
+
 describe('accent-insensitive search', () => {
   const items = [
     {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { filterRecipes } from '../filter.js';
+import { useLanguage } from '../useLanguage.jsx';
 import RecipeCard from './RecipeCard.jsx';
 
 // Past this the slats are all at their floor height and it's just scrolling;
@@ -24,6 +25,7 @@ function useTwoColumns() {
 // Search, filters and scroll position live in App so they survive the trip
 // into a recipe and back: the list you return to is the list you left.
 export default function RecipeGrid({ recipes, categories, filters, onFilters, scrollRef }) {
+  const { t } = useLanguage();
   const { query, categoryId, tag, ingredient, filtersOpen } = filters;
   const set = (patch) => onFilters({ ...filters, ...patch });
   const stacksRef = useRef(null);
@@ -78,7 +80,7 @@ export default function RecipeGrid({ recipes, categories, filters, onFilters, sc
       <input
         className="search"
         type="search"
-        placeholder="Search recipes, ingredients…"
+        placeholder={t('searchPlaceholder')}
         value={query}
         onChange={(e) => set({ query: e.target.value })}
       />
@@ -89,7 +91,7 @@ export default function RecipeGrid({ recipes, categories, filters, onFilters, sc
           style={{ '--chip-color': '#8b8378' }}
           onClick={() => set({ categoryId: null })}
         >
-          All
+          {t('all')}
         </button>
         {categories.map((c) => (
           <button
@@ -111,11 +113,12 @@ export default function RecipeGrid({ recipes, categories, filters, onFilters, sc
           aria-expanded={filtersOpen}
           onClick={() => set({ filtersOpen: !filtersOpen })}
         >
-          Filters{hiddenCount > 0 ? ` (${hiddenCount})` : ''} {filtersOpen ? '▲' : '▼'}
+          {t('filters')}
+          {hiddenCount > 0 ? ` (${hiddenCount})` : ''} {filtersOpen ? '▲' : '▼'}
         </button>
         {hasFilters && (
           <button type="button" className="btn ghost small" onClick={clearFilters}>
-            Clear
+            {t('clear')}
           </button>
         )}
       </div>
@@ -123,25 +126,25 @@ export default function RecipeGrid({ recipes, categories, filters, onFilters, sc
       {filtersOpen && (
         <div className="filter-panel">
           <label className="filter-ingredient">
-            Ingredient
+            {t('ingredient')}
             <input
               type="text"
               value={ingredient}
               onChange={(e) => set({ ingredient: e.target.value })}
-              placeholder="e.g. campari"
+              placeholder={t('ingredientPlaceholder')}
             />
           </label>
           {tagNames.length > 0 && (
             <div className="chips" role="tablist">
-              {tagNames.map((t) => (
+              {tagNames.map((name) => (
                 <button
-                  key={t}
+                  key={name}
                   type="button"
-                  className={tag === t ? 'chip active' : 'chip'}
+                  className={tag === name ? 'chip active' : 'chip'}
                   style={{ '--chip-color': '#8b8378' }}
-                  onClick={() => set({ tag: tag === t ? null : t })}
+                  onClick={() => set({ tag: tag === name ? null : name })}
                 >
-                  #{t}
+                  #{name}
                 </button>
               ))}
             </div>
@@ -152,13 +155,13 @@ export default function RecipeGrid({ recipes, categories, filters, onFilters, sc
             onClick={findSomethingGood}
             disabled={matched.length === 0}
           >
-            Find me something good
+            {t('findGood')}
           </button>
         </div>
       )}
 
       {visible.length === 0 ? (
-        <p className="notice">No recipes match. Time to invent one?</p>
+        <p className="notice">{t('noMatch')}</p>
       ) : (
         <>
           <div
@@ -180,7 +183,7 @@ export default function RecipeGrid({ recipes, categories, filters, onFilters, sc
           </div>
           {matched.length > visible.length && (
             <p className="notice stack-more">
-              Showing {visible.length} of {matched.length}. Search or filter to find the rest.
+              {t('showing', { shown: visible.length, total: matched.length })}
             </p>
           )}
         </>
