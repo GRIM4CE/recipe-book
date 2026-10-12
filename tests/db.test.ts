@@ -120,6 +120,20 @@ describe("recipes", () => {
   });
 });
 
+describe("recipe counts", () => {
+  it("counts recipes per creator, as stored", async () => {
+    const make = (title: string, createdBy: string) =>
+      db.createRecipe({ title }, { createdBy, source: "web" });
+    await make("Counted A", "counter-ann");
+    await make("Counted B", "counter-ann");
+    await make("Counted C", "Counter-Bob");
+    const counts = await db.countRecipesByCreator();
+    expect(counts.get("counter-ann")).toBe(2);
+    expect(counts.get("Counter-Bob")).toBe(1);
+    expect(counts.get("counter-nobody")).toBeUndefined();
+  });
+});
+
 describe("tags", () => {
   it("creates tags on the fly and round-trips them", async () => {
     const created = await db.createRecipe(

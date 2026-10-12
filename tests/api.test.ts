@@ -711,9 +711,50 @@ describe("invites", () => {
     expect(missing.body.error).toBe("accounts are not configured");
     const ok = await get(inviteApp(directory), "alice");
     expect(ok.status).toBe(200);
-    expect(ok.body).toEqual({ users: stubAccounts });
+    expect(ok.body.users).toMatchObject(stubAccounts);
     expect(ok.body.users.map((u: UserAccount) => u.displayName)).toEqual(["Alice", null]);
     expect((await request(inviteApp(directory)).get("/api/users")).status).toBe(401);
+  });
+
+  it("marks accounts active or invited and counts each person's recipes", async () => {
+    const { directory } = stubDirectory();
+    const sam: UserAccount = {
+      username: "sam",
+      email: "sam@example.com",
+      displayName: "sam",
+      createdAt: "2026-03-01T00:00:00.000Z",
+      enabled: true,
+      status: "CONFIRMED",
+    };
+    const withSam: UserDirectory = {
+      ...directory,
+      list: async () => [...stubAccounts, sam],
+    };
+    // Alice signed some recipes with her chosen name and one with her sign-in
+    // name, from before she chose; the invited cousin has one under their
+    // email. Sam's chosen name is also their sign-in name, so theirs count once.
+    const sign = (createdBy: string, title: string) =>
+      db.createRecipe({ title }, { createdBy, source: "web" });
+    await sign("Alice", "Alice Soup");
+    await sign("Alice", "Alice Stew");
+    await sign("alice", "Alice Early Bread");
+    await sign("cousin@example.com", "Cousin Pie");
+    await sign("sam", "Sam Salad");
+    await sign("sam", "Sam Soup");
+    const res = await request(inviteApp(withSam))
+      .get("/api/users")
+      .set("Authorization", "Bearer alice-token");
+    expect(
+      res.body.users.map((u: { username: string; state: string; recipeCount: number }) => [
+        u.username,
+        u.state,
+        u.recipeCount,
+      ]),
+    ).toEqual([
+      ["alice", "active", 3],
+      ["cousin@example.com", "invited", 1],
+      ["sam", "active", 2],
+    ]);
   });
 });
 

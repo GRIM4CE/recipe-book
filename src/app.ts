@@ -611,7 +611,16 @@ export function createApp(opts: AppOptions) {
       res.status(503).json({ error: "accounts are not configured" });
       return;
     }
-    res.json({ users: await opts.directory.list() });
+    // A recipe is signed with the display name or, before one was chosen, the
+    // sign-in name, so a person's recipes sit under any of their names.
+    const counts = await db.countRecipesByCreator();
+    const users = (await opts.directory.list()).map((u) => {
+      const names = new Set([u.displayName, u.username, u.email]);
+      let recipeCount = 0;
+      for (const name of names) recipeCount += (name && counts.get(name)) || 0;
+      return { ...u, state: u.displayName ? "active" : "invited", recipeCount };
+    });
+    res.json({ users });
   });
 
   app.post("/api/users", writeAuth, async (req, res) => {

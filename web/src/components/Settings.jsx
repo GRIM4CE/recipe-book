@@ -117,6 +117,8 @@ function People({ users }) {
             {u.displayName && <span className="hint">{u.email ?? u.username}</span>}
             <span className="hint">
               {t('joined', { date: dateFormat.format(new Date(u.createdAt)) })}
+              {` · ${t(u.state === 'active' ? 'stateActive' : 'stateInvited')}`}
+              {` · ${t(u.recipeCount === 1 ? 'recipeCountOne' : 'recipeCount', { n: u.recipeCount })}`}
               {!u.enabled && ` · ${t('disabled')}`}
             </span>
           </li>
