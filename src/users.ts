@@ -1,7 +1,9 @@
 import { randomBytes } from "node:crypto";
 import {
   AdminCreateUserCommand,
+  AdminGetUserCommand,
   AdminSetUserPasswordCommand,
+  AdminUpdateUserAttributesCommand,
   CognitoIdentityProviderClient,
   ListUsersCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
@@ -9,6 +11,7 @@ import {
 export interface UserAccount {
   username: string;
   email: string | null;
+  displayName: string | null;
   createdAt: string;
   enabled: boolean;
   status: string;
@@ -16,10 +19,19 @@ export interface UserAccount {
 
 // The accounts in the Cognito user pool. invite makes the same two calls as
 // scripts/add-user.sh; "exists" means the username was already taken and
-// nothing was changed. list is everyone, oldest first.
+// nothing was changed. The sign-in username can't change, so the name a person
+// picks is the standard preferred_username attribute: getProfile reads it (null
+// until chosen) and setDisplayName writes it, answering "taken" when another
+// account already has it. list is everyone, oldest first.
 export interface UserDirectory {
   invite(input: { username: string; email: string }): Promise<"created" | "exists">;
+  getProfile(username: string): Promise<{ displayName: string | null }>;
+  setDisplayName(username: string, displayName: string): Promise<"set" | "taken">;
   list(): Promise<UserAccount[]>;
+}
+
+function attribute(attrs: { Name?: string; Value?: string }[] | undefined, name: string) {
+  return attrs?.find((a) => a.Name === name)?.Value ?? null;
 }
 
 export function createCognitoDirectory(opts: {
@@ -60,6 +72,32 @@ export function createCognitoDirectory(opts: {
       );
       return "created";
     },
+    async getProfile(username) {
+      const user = await client.send(
+        new AdminGetUserCommand({ UserPoolId: opts.userPoolId, Username: username }),
+      );
+      return { displayName: attribute(user.UserAttributes, "preferred_username") };
+    },
+    async setDisplayName(username, displayName) {
+      // displayName never contains a double quote (the route rejects it), so it
+      // can sit inside the filter's quotes as is.
+      const found = await client.send(
+        new ListUsersCommand({
+          UserPoolId: opts.userPoolId,
+          Filter: `preferred_username = "${displayName}"`,
+          Limit: 1,
+        }),
+      );
+      if ((found.Users ?? []).some((u) => u.Username !== username)) return "taken";
+      await client.send(
+        new AdminUpdateUserAttributesCommand({
+          UserPoolId: opts.userPoolId,
+          Username: username,
+          UserAttributes: [{ Name: "preferred_username", Value: displayName }],
+        }),
+      );
+      return "set";
+    },
     async list() {
       const users: UserAccount[] = [];
       let token: string | undefined;
@@ -74,7 +112,8 @@ export function createCognitoDirectory(opts: {
         for (const u of page.Users ?? []) {
           users.push({
             username: u.Username ?? "",
-            email: u.Attributes?.find((a) => a.Name === "email")?.Value ?? null,
+            email: attribute(u.Attributes, "email"),
+            displayName: attribute(u.Attributes, "preferred_username"),
             createdAt: (u.UserCreateDate ?? new Date(0)).toISOString(),
             enabled: u.Enabled ?? true,
             status: u.UserStatus ?? "",

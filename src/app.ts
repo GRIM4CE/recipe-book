@@ -153,6 +153,13 @@ function parseInviteInput(
   return { username: email.toLowerCase(), email };
 }
 
+function parseUsernameInput(body: unknown): string | null {
+  if (typeof body !== "object" || body === null) return null;
+  const name = (body as Record<string, unknown>).username;
+  if (typeof name !== "string") return null;
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{1,31}$/.test(name) ? name : null;
+}
+
 function parseTagName(body: unknown): string | null {
   if (typeof body !== "object" || body === null) return null;
   const b = body as Record<string, unknown>;
@@ -296,6 +303,11 @@ export function createApp(opts: AppOptions) {
 
   app.use(express.json({ limit: "1mb" }));
 
+  // The name recipes are signed with: the person's chosen username, or their
+  // sign-in name until they pick one (always, in local dev).
+  const displayNameFor = async (username: string) =>
+    (await opts.directory?.getProfile(username))?.displayName ?? username;
+
   const photoBaseUrl = opts.photoBaseUrl ?? "";
   const serialize = (r: Recipe) => ({
     ...r,
@@ -343,7 +355,7 @@ export function createApp(opts: AppOptions) {
       return;
     }
     const recipe = await db.createRecipe(input, {
-      createdBy: String(res.locals.username),
+      createdBy: await displayNameFor(String(res.locals.username)),
       source: "web",
     });
     res.status(201).json(serialize(recipe));
@@ -391,7 +403,7 @@ export function createApp(opts: AppOptions) {
         tags: original.tags,
         photoKey: original.photoKey,
       },
-      { createdBy: String(res.locals.username), source: "web" },
+      { createdBy: await displayNameFor(String(res.locals.username)), source: "web" },
     );
     res.status(201).json(serialize(copy));
   });
@@ -558,9 +570,36 @@ export function createApp(opts: AppOptions) {
     res.status(204).end();
   });
 
-  app.get("/api/me", writeAuth, (_req, res) => {
+  app.get("/api/me", writeAuth, async (_req, res) => {
     const username = String(res.locals.username);
-    res.json({ username, canInvite: adminUsernames.includes(username) });
+    const profile = await opts.directory?.getProfile(username);
+    // With accounts, displayName is null until the person picks one (that is
+    // what needsUsername reports); without them (local dev) it is the username.
+    res.json({
+      username,
+      displayName: profile ? profile.displayName : username,
+      canInvite: adminUsernames.includes(username),
+      needsUsername: Boolean(profile) && profile?.displayName == null,
+    });
+  });
+
+  app.post("/api/me/username", writeAuth, async (req, res) => {
+    if (!opts.directory) {
+      res.status(503).json({ error: "accounts are not configured" });
+      return;
+    }
+    const displayName = parseUsernameInput(req.body);
+    if (displayName === null) {
+      res.status(400).json({
+        error: "username must be 2–32 letters, numbers, dots, dashes or underscores",
+      });
+      return;
+    }
+    if ((await opts.directory.setDisplayName(String(res.locals.username), displayName)) === "taken") {
+      res.status(409).json({ error: "that username is taken" });
+      return;
+    }
+    res.json({ displayName });
   });
 
   app.get("/api/users", writeAuth, async (_req, res) => {
