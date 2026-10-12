@@ -107,7 +107,7 @@ export const STRINGS = {
     deleteMessage: 'This can’t be undone.',
 
     // Login
-    username: 'Username',
+    loginName: 'Email or username',
     devHint: 'Dev mode: any name signs you in, writes run as “dev”.',
     emailCode: 'Code from your email',
     signingIn: 'Signing in…',
@@ -129,16 +129,19 @@ export const STRINGS = {
     // Settings
     signedInAs: 'Signed in as',
     signOut: 'Sign out',
+    peopleTitle: 'People with access',
+    joined: 'Added {date}',
+    disabled: 'Disabled',
     inviteTitle: 'Invite someone',
-    inviteHint: 'They get an account on this recipe book.',
+    inviteHint: 'Enter their email. They’ll sign in with it.',
     email: 'Email',
     invite: 'Invite',
     inviting: 'Inviting…',
-    invited: '{name} can sign in now. Tell them:',
-    inviteStep1: 'Open {url}',
-    inviteStep2: 'Enter the username “{name}”',
-    inviteStep3: 'Choose “Email me a code instead” and enter the code from their inbox',
-    inviteStep4: 'Accept the “Add a passkey” banner; after that it’s Face ID / fingerprint only',
+    invited: '{email} can sign in now.',
+    sendInvite: 'Send invitation',
+    inviteCopied: 'Invitation copied',
+    inviteMessage:
+      'You’re invited to Recipe Book.\n\n1. Open {url}\n2. Sign in with your email: {email}\n3. Choose “Email me a code instead” and enter the code from your inbox\n4. Accept the “Add a passkey” banner — after that it’s Face ID or fingerprint only',
     inviteAnother: 'Invite someone else',
   },
   fr: {
@@ -235,7 +238,7 @@ export const STRINGS = {
     deleteTitle: 'Supprimer « {title} » ?',
     deleteMessage: 'Cette action est irréversible.',
 
-    username: 'Nom d’utilisateur',
+    loginName: 'E-mail ou nom d’utilisateur',
     devHint: 'Mode dev : n’importe quel nom vous connecte, les écritures sont faites par « dev ».',
     emailCode: 'Code reçu par e-mail',
     signingIn: 'Connexion…',
@@ -255,17 +258,19 @@ export const STRINGS = {
 
     signedInAs: 'Connecté en tant que',
     signOut: 'Se déconnecter',
+    peopleTitle: 'Qui a accès',
+    joined: 'Ajouté·e le {date}',
+    disabled: 'Désactivé',
     inviteTitle: 'Inviter quelqu’un',
-    inviteHint: 'Ils auront un compte sur ce livre de recettes.',
+    inviteHint: 'Saisissez leur e-mail. Ils se connecteront avec.',
     email: 'E-mail',
     invite: 'Inviter',
     inviting: 'Invitation…',
-    invited: '{name} peut maintenant se connecter. À leur dire :',
-    inviteStep1: 'Ouvrir {url}',
-    inviteStep2: 'Saisir le nom d’utilisateur « {name} »',
-    inviteStep3: 'Choisir « Recevoir plutôt un code par e-mail » et saisir le code reçu',
-    inviteStep4:
-      'Accepter la bannière « Ajouter une clé d’accès » ; ensuite ce sera Face ID ou empreinte uniquement',
+    invited: '{email} peut maintenant se connecter.',
+    sendInvite: 'Envoyer l’invitation',
+    inviteCopied: 'Invitation copiée',
+    inviteMessage:
+      'Vous êtes invité·e sur Livre de recettes.\n\n1. Ouvrez {url}\n2. Connectez-vous avec votre e-mail : {email}\n3. Choisissez « Recevoir plutôt un code par e-mail » et saisissez le code reçu\n4. Acceptez la bannière « Ajouter une clé d’accès » — ensuite ce sera Face ID ou empreinte uniquement',
     inviteAnother: 'Inviter quelqu’un d’autre',
   },
 };

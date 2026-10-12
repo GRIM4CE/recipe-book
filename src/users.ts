@@ -3,19 +3,29 @@ import {
   AdminCreateUserCommand,
   AdminSetUserPasswordCommand,
   CognitoIdentityProviderClient,
+  ListUsersCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 
-// Creates accounts in the Cognito user pool, the same two calls as
-// scripts/add-user.sh. "exists" means the username was already taken and
-// nothing was changed.
-export interface UserInviter {
-  invite(input: { username: string; email: string }): Promise<"created" | "exists">;
+export interface UserAccount {
+  username: string;
+  email: string | null;
+  createdAt: string;
+  enabled: boolean;
+  status: string;
 }
 
-export function createCognitoInviter(opts: {
+// The accounts in the Cognito user pool. invite makes the same two calls as
+// scripts/add-user.sh; "exists" means the username was already taken and
+// nothing was changed. list is everyone, oldest first.
+export interface UserDirectory {
+  invite(input: { username: string; email: string }): Promise<"created" | "exists">;
+  list(): Promise<UserAccount[]>;
+}
+
+export function createCognitoDirectory(opts: {
   userPoolId: string;
   region: string;
-}): UserInviter {
+}): UserDirectory {
   const client = new CognitoIdentityProviderClient({ region: opts.region });
   return {
     async invite({ username, email }) {
@@ -49,6 +59,30 @@ export function createCognitoInviter(opts: {
         }),
       );
       return "created";
+    },
+    async list() {
+      const users: UserAccount[] = [];
+      let token: string | undefined;
+      do {
+        const page = await client.send(
+          new ListUsersCommand({
+            UserPoolId: opts.userPoolId,
+            Limit: 60,
+            PaginationToken: token,
+          }),
+        );
+        for (const u of page.Users ?? []) {
+          users.push({
+            username: u.Username ?? "",
+            email: u.Attributes?.find((a) => a.Name === "email")?.Value ?? null,
+            createdAt: (u.UserCreateDate ?? new Date(0)).toISOString(),
+            enabled: u.Enabled ?? true,
+            status: u.UserStatus ?? "",
+          });
+        }
+        token = page.PaginationToken;
+      } while (token);
+      return users.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     },
   };
 }

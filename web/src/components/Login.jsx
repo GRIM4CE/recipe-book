@@ -48,7 +48,7 @@ export default function Login({ onLogin }) {
       <h2>{t('signIn')}</h2>
       {devMode && <p className="hint">{t('devHint')}</p>}
       <label>
-        {t('username')}
+        {t('loginName')}
         <input
           value={username}
           onChange={(e) => setUsername(e.target.value)}

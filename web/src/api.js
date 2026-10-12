@@ -40,6 +40,7 @@ export const api = {
   listTags: () => req('/api/tags').then((b) => b.tags),
 
   me: () => authed('/api/me'),
+  listUsers: () => authed('/api/users'),
   inviteUser: (data) => authed('/api/users', { method: 'POST', body: json(data) }),
 
   createRecipe: (data) => authed('/api/recipes', { method: 'POST', body: json(data) }),

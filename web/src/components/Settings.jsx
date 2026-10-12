@@ -3,21 +3,21 @@ import { api } from '../api.js';
 import { useLanguage } from '../useLanguage.jsx';
 import LanguageSwitch from './LanguageSwitch.jsx';
 
-function Invite() {
+function Invite({ onInvited }) {
   const { t } = useLanguage();
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [invited, setInvited] = useState(null);
+  const [note, setNote] = useState('');
 
   async function submit(e) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const created = await api.inviteUser({ username: username.trim(), email: email.trim() });
-      setInvited(created.username);
+      setInvited(await api.inviteUser({ email: email.trim() }));
+      onInvited();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -26,9 +26,27 @@ function Invite() {
   }
 
   function reset() {
-    setUsername('');
     setEmail('');
     setInvited(null);
+  }
+
+  const message = invited
+    ? t('inviteMessage', { url: `${window.location.origin}/#/login`, email: invited.email })
+    : '';
+
+  async function send() {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: t('appName'), text: message });
+        return;
+      }
+      await navigator.clipboard.writeText(message);
+      setNote(t('inviteCopied'));
+    } catch (err) {
+      if (err?.name === 'AbortError') return; // user dismissed the share sheet
+      setNote(t('shareFailed'));
+    }
+    setTimeout(() => setNote(''), 2000);
   }
 
   return (
@@ -36,13 +54,14 @@ function Invite() {
       <p className="settings-label">{t('inviteTitle')}</p>
       {invited ? (
         <>
-          <p>{t('invited', { name: invited })}</p>
-          <ol className="invite-steps">
-            <li>{t('inviteStep1', { url: `${window.location.origin}/#/login` })}</li>
-            <li>{t('inviteStep2', { name: invited })}</li>
-            <li>{t('inviteStep3')}</li>
-            <li>{t('inviteStep4')}</li>
-          </ol>
+          <p>{t('invited', { email: invited.email })}</p>
+          <pre className="invite-message">{message}</pre>
+          <div className="invite-actions">
+            <button className="btn primary" type="button" onClick={send}>
+              {t('sendInvite')}
+            </button>
+            {note && <span className="share-note">{note}</span>}
+          </div>
           <button className="btn ghost" type="button" onClick={reset}>
             {t('inviteAnother')}
           </button>
@@ -50,17 +69,6 @@ function Invite() {
       ) : (
         <form className="form" onSubmit={submit}>
           <p className="hint">{t('inviteHint')}</p>
-          <label>
-            {t('username')}
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoCapitalize="none"
-              autoComplete="off"
-              spellCheck={false}
-              required
-            />
-          </label>
           <label>
             {t('email')}
             <input
@@ -81,16 +89,53 @@ function Invite() {
   );
 }
 
+function People({ users }) {
+  const { lang, t } = useLanguage();
+  const dateFormat = new Intl.DateTimeFormat(lang === 'fr' ? 'fr-FR' : 'en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  return (
+    <div className="settings-section">
+      <p className="settings-label">{t('peopleTitle')}</p>
+      <ul className="people-list">
+        {users.map((u) => (
+          <li key={u.username}>
+            <span>{u.email ?? u.username}</span>
+            <span className="hint">
+              {t('joined', { date: dateFormat.format(new Date(u.createdAt)) })}
+              {!u.enabled && ` · ${t('disabled')}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function Settings({ user, onSignOut }) {
   const { t } = useLanguage();
   const [canInvite, setCanInvite] = useState(false);
+  const [users, setUsers] = useState([]);
 
-  // A failed lookup just leaves the invite section out.
+  // A failed lookup just leaves the admin sections out.
+  const loadUsers = () =>
+    api
+      .listUsers()
+      .then((res) => setUsers(res.users))
+      .catch(() => {});
+
   useEffect(() => {
     let live = true;
     api
       .me()
-      .then((me) => live && setCanInvite(Boolean(me.canInvite)))
+      .then((me) => {
+        if (!live) return;
+        setCanInvite(Boolean(me.canInvite));
+        if (me.canInvite) loadUsers();
+      })
       .catch(() => {});
     return () => {
       live = false;
@@ -108,7 +153,8 @@ export default function Settings({ user, onSignOut }) {
         <p className="settings-label">{t('language')}</p>
         <LanguageSwitch />
       </div>
-      {canInvite && <Invite />}
+      {canInvite && users.length > 0 && <People users={users} />}
+      {canInvite && <Invite onInvited={loadUsers} />}
       <button className="btn danger" type="button" onClick={onSignOut}>
         {t('signOut')}
       </button>
