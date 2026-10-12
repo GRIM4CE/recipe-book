@@ -253,6 +253,7 @@ export function createApp(opts: AppOptions) {
           servings: r.servings,
           ingredients: r.ingredients,
           instructions: r.instructions,
+          language: r.language,
           categoryId: category?.id ?? null,
           notes: attributionNotes(sourceUrl, r.credit),
         });
