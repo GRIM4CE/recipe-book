@@ -5,7 +5,11 @@ import express, { type ErrorRequestHandler, type RequestHandler } from "express"
 import { requireUser, type TokenVerifier } from "./auth.js";
 import { createExternalRouter } from "./external.js";
 import type { Db } from "./db.js";
-import type { ExtractionResult, Extractor } from "./extract.js";
+import {
+  describeExtractionError,
+  type ExtractionResult,
+  type Extractor,
+} from "./extract.js";
 import type { Translator } from "./translate.js";
 import { LANGUAGES, type Language, type Recipe, type RecipeInput } from "./types.js";
 import type { Presigner } from "./uploads.js";
@@ -225,12 +229,14 @@ export function createApp(opts: AppOptions) {
         });
       } catch (err) {
         console.error("extraction failed:", err);
-        res.status(502).json({ error: "extraction failed" });
+        const { status, message } = describeExtractionError(err);
+        res.status(status).json({ error: message });
         return;
       }
       if (result.pageUnreadable) {
         res.status(422).json({
-          error: "couldn't read that page — copy the recipe text instead",
+          error:
+            "That site wouldn't let us read the page — many recipe sites block automated readers. Copy the recipe text from the page and paste it instead.",
         });
         return;
       }

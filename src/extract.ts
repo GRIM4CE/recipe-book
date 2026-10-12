@@ -1,4 +1,12 @@
-import Anthropic from "@anthropic-ai/sdk";
+import Anthropic, {
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  APIError,
+  AuthenticationError,
+  InternalServerError,
+  PermissionDeniedError,
+  RateLimitError,
+} from "@anthropic-ai/sdk";
 import type { Language } from "./types.js";
 
 // Extraction seam: turns pasted text or a photographed recipe into structured
@@ -131,8 +139,93 @@ export function buildPrompt(input: ExtractInput): string {
   ].join("\n");
 }
 
+// Wall-clock budget for one extraction across every API round trip. Mobile
+// Safari abandons a request at about 60 seconds, so the Lambda has to answer
+// with a reason before then rather than be killed mid-call.
+const EXTRACTION_BUDGET_MS = 50_000;
+
+// A failure with a user-facing reason and the HTTP status the route should
+// send. Anything else that escapes extract() is translated by
+// describeExtractionError.
+export class ExtractionFailure extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+// Maps whatever extract() threw to the status and sentence the route returns.
+// The route still logs the raw error; this is what the person sees.
+export function describeExtractionError(err: unknown): {
+  status: number;
+  message: string;
+} {
+  if (err instanceof ExtractionFailure) {
+    return { status: err.status, message: err.message };
+  }
+  if (err instanceof APIConnectionTimeoutError) {
+    return {
+      status: 504,
+      message: `Reading took longer than ${EXTRACTION_BUDGET_MS / 1000} seconds and was stopped. Try again, or copy the recipe text from the page and paste it instead.`,
+    };
+  }
+  if (err instanceof APIConnectionError) {
+    return {
+      status: 502,
+      message: "Couldn't reach the recipe reader. Try again in a moment.",
+    };
+  }
+  if (err instanceof AuthenticationError || err instanceof PermissionDeniedError) {
+    return {
+      status: 502,
+      message:
+        "The recipe reader's API key was rejected. It needs to be replaced in the deploy settings.",
+    };
+  }
+  if (err instanceof RateLimitError) {
+    return {
+      status: 503,
+      message:
+        "The recipe reader is rate-limited right now. Wait a minute and try again.",
+    };
+  }
+  if (err instanceof InternalServerError) {
+    return {
+      status: 503,
+      message:
+        "The recipe reader is having trouble on its end. Wait a minute and try again.",
+    };
+  }
+  if (err instanceof APIError) {
+    // A 4xx the SDK doesn't name separately, e.g. a billing hold on a 400:
+    // the API's own message is the most useful reason we have.
+    const body = err.error as { error?: { message?: string } } | undefined;
+    const reason = body?.error?.message ?? err.message;
+    return {
+      status: 502,
+      message: `The recipe reader rejected the request: ${reason}`,
+    };
+  }
+  if (err instanceof SyntaxError) {
+    return {
+      status: 502,
+      message:
+        "The recipe reader answered in a format we couldn't read. Try again.",
+    };
+  }
+  return {
+    status: 502,
+    message:
+      "Recipe reading failed unexpectedly. Try again, or copy the recipe text and paste it instead.",
+  };
+}
+
 export function createClaudeExtractor(opts: { apiKey: string }): Extractor {
-  const client = new Anthropic({ apiKey: opts.apiKey });
+  // No SDK retries: a retried call can't fit in the budget, and a clear
+  // "try again" beats a silent second attempt that overruns the browser.
+  const client = new Anthropic({ apiKey: opts.apiKey, maxRetries: 0 });
   return {
     async extract(input) {
       const content: Anthropic.ContentBlockParam[] = [];
@@ -166,15 +259,32 @@ export function createClaudeExtractor(opts: { apiKey: string }): Extractor {
       };
 
       const messages: Anthropic.MessageParam[] = [{ role: "user", content }];
-      let response = await client.messages.create({ ...base, messages });
+      // Each round trip gets whatever is left of the budget; the SDK throws
+      // APIConnectionTimeoutError when it runs out.
+      const deadline = Date.now() + EXTRACTION_BUDGET_MS;
+      const call = () =>
+        client.messages.create(
+          { ...base, messages },
+          { timeout: Math.max(1, deadline - Date.now()) },
+        );
+      let response = await call();
       // Server-tool turns can pause mid-loop; append the assistant turn and
-      // re-send to resume, bounded so a wedged loop becomes a 502.
+      // re-send to resume, bounded so a wedged loop becomes an error.
       for (let i = 0; i < 5 && response.stop_reason === "pause_turn"; i++) {
         messages.push({ role: "assistant", content: response.content });
-        response = await client.messages.create({ ...base, messages });
+        response = await call();
       }
       if (response.stop_reason === "pause_turn") {
-        throw new Error("extraction did not finish (pause_turn limit)");
+        throw new ExtractionFailure(
+          502,
+          "Reading the page took too many steps and was stopped. Copy the recipe text from the page and paste it instead.",
+        );
+      }
+      if (response.stop_reason === "refusal") {
+        throw new ExtractionFailure(
+          422,
+          "The recipe reader declined to read this input.",
+        );
       }
       // With server tools the transcript interleaves tool blocks; the JSON
       // answer is the LAST text block.

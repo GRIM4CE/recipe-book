@@ -36,7 +36,9 @@ Resources:
       Runtime: nodejs22.x
       Architectures: [arm64]
       MemorySize: 512
-      Timeout: 60
+      # Extraction budgets 50s of model time (src/extract.ts); the rest is
+      # headroom for cold start and database round trips.
+      Timeout: 90
       # CORS stays unset here on purpose: Express handles it. Both set would
       # emit duplicate headers and browsers reject the response.
       FunctionUrlConfig:
