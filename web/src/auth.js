@@ -84,8 +84,18 @@ export async function submitEmailCode(code) {
   return finish(username, done.AuthenticationResult);
 }
 
-export function logout() {
+// Signing out clears this device and asks Cognito to revoke the refresh
+// token, so a copy taken from this browser stops working too. The device is
+// signed out even when Cognito can't be reached.
+export async function logout() {
+  const session = load();
   save(null);
+  if (devMode || !session?.refreshToken) return;
+  try {
+    await cognito('RevokeToken', { Token: session.refreshToken, ClientId: clientId });
+  } catch {
+    // Offline or already revoked: the token expires on its own.
+  }
 }
 
 export async function getAccessToken() {

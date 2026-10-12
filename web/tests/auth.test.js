@@ -57,6 +57,37 @@ describe('email code flow', () => {
   });
 });
 
+describe('logout', () => {
+  async function signedIn() {
+    const auth = await freshAuth();
+    fetchReturns({ ChallengeName: 'EMAIL_OTP', Session: 's' }, { AuthenticationResult: TOKENS });
+    await auth.requestEmailCode('alex');
+    await auth.submitEmailCode('123456');
+    return auth;
+  }
+
+  it('revokes the refresh token and clears the session', async () => {
+    const auth = await signedIn();
+    fetchReturns({});
+
+    await auth.logout();
+
+    const revoke = JSON.parse(fetch.mock.calls[2][1].body);
+    expect(fetch.mock.calls[2][1].headers['X-Amz-Target']).toMatch(/RevokeToken$/);
+    expect(revoke.Token).toBe('rt');
+    expect(revoke.ClientId).toBe('client-1');
+    expect(auth.currentUser()).toBeNull();
+  });
+
+  it('still clears the session when the revoke call fails', async () => {
+    const auth = await signedIn();
+    globalThis.fetch.mockRejectedValueOnce(new Error('offline'));
+
+    await expect(auth.logout()).resolves.toBeUndefined();
+    expect(auth.currentUser()).toBeNull();
+  });
+});
+
 describe('loginAsDev', () => {
   it('stores a session that currentUser returns', async () => {
     const auth = await freshAuth();
