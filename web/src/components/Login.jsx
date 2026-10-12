@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { devMode, loginWithPasskey, requestEmailCode, submitEmailCode } from '../auth.js';
+import { devMode, loginAsDev, requestEmailCode, submitEmailCode } from '../auth.js';
 import { useLanguage } from '../useLanguage.jsx';
 
 export default function Login({ onLogin }) {
   const { t } = useLanguage();
   const [username, setUsername] = useState('');
-  const [mode, setMode] = useState('passkey'); // 'passkey' | 'email' | 'code'
+  const [mode, setMode] = useState('email'); // 'email' | 'code'
   const [code, setCode] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -21,7 +21,6 @@ export default function Login({ onLogin }) {
     try {
       await fn();
     } catch (err) {
-      if (err.code === 'NO_PASSKEY') setMode('email');
       setError(err.message);
     } finally {
       setBusy(false);
@@ -31,8 +30,8 @@ export default function Login({ onLogin }) {
   async function submit(e) {
     e.preventDefault();
     const name = username.trim();
-    if (mode === 'passkey') {
-      await run(async () => finish(await loginWithPasskey(name)));
+    if (devMode) {
+      finish(loginAsDev(name));
     } else if (mode === 'email') {
       await run(async () => {
         await requestEmailCode(name);
@@ -52,7 +51,7 @@ export default function Login({ onLogin }) {
         <input
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          autoComplete="username webauthn"
+          autoComplete="username"
           disabled={mode === 'code'}
           required
         />
@@ -71,26 +70,8 @@ export default function Login({ onLogin }) {
       )}
       {error && <p className="error">{error}</p>}
       <button className="btn primary" type="submit" disabled={busy}>
-        {busy
-          ? t('signingIn')
-          : mode === 'passkey'
-            ? t('signInPasskey')
-            : mode === 'email'
-              ? t('emailMeCode')
-              : t('signIn')}
+        {busy ? t('signingIn') : devMode || mode === 'code' ? t('signIn') : t('emailMeCode')}
       </button>
-      {!devMode && mode === 'passkey' && (
-        <button
-          className="btn ghost small"
-          type="button"
-          onClick={() => {
-            setMode('email');
-            setError(null);
-          }}
-        >
-          {t('emailMeCodeInstead')}
-        </button>
-      )}
       {mode === 'code' && (
         <button
           className="btn ghost small"

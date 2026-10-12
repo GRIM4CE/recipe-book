@@ -147,10 +147,9 @@ curl <ApiUrl>/api/recipes                # {"recipes":[]}
 
 ### Create accounts
 
-Sign-in is passkey-first with email codes as bootstrap/recovery, so each
-account needs a verified email and no usable password (a random one is set,
-which only clears Cognito's initial challenge state; the app client has no
-password flow).
+Sign-in is by email code, so each account needs a verified email and no
+usable password (a random one is set, which only clears Cognito's initial
+challenge state; the app client has no password flow).
 
 Set `ADMIN_USERNAMES` to your username (then deploy once), sign in, open
 Settings → Invite someone, enter just their email; their sign-in name is that
@@ -168,10 +167,9 @@ above, and runs `admin-create-user` (verified email, `--message-action
 SUPPRESS`) then `admin-set-user-password --permanent`: the same two calls the
 app makes.
 
-The sign-in link is hidden from visitors, so a new person's first sign-in
-goes to `<app url>/#/login`. On each device: enter the email, choose “Email
-me a code instead”, then accept the “Add a passkey” banner. After that, signing in
-is just Face ID or a fingerprint; the email code stays as the fallback. A lost phone just repeats this bootstrap.
+The sign-in icon is in the app's header (or open `<app url>/#/login`). On
+each device, the first and every later sign-in is the same: enter the name,
+receive a code by email, enter it. The device then stays signed in.
 
 ## 3. Web (Amplify Hosting)
 
@@ -209,7 +207,6 @@ dropped, not created.
 - [ ] `curl <ApiUrl>/healthz` → `{"ok":true}`
 - [ ] Amplify URL renders the (empty) grid — proves CORS
 - [ ] Sign in as each account with an email code; anonymous visitors see no write UI
-- [ ] Register a passkey on each phone; sign out and back in via passkey
 - [ ] Create a recipe with a photo — proves JWT, presign, public S3 read
 - [ ] Recipe shows "Added by <account>" attribution
 - [ ] `POST /api/external/recipes` with a wrong secret → 401; right secret → recipe appears
