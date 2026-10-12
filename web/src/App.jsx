@@ -81,16 +81,11 @@ export default function App() {
     }
   }
 
-  // Translating takes a few seconds, so saving doesn't wait for it: the
-  // translated text shows up on the next reload. Failures are fine (translation
-  // may not be configured); the Translate button on the recipe retries.
+  // Nothing is translated here: a translation is made when someone picks that
+  // language on the recipe (see onViewLanguage).
   function onSaved(recipe) {
     reload();
     window.location.hash = `#/recipes/${recipe.id}`;
-    api
-      .translateRecipe(recipe.id)
-      .then(() => reload())
-      .catch(() => {});
   }
 
   async function onTranslateRecipe(recipe) {

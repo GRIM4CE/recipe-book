@@ -1,4 +1,5 @@
 import { useLanguage } from '../useLanguage.jsx';
+import LanguageSwitch from './LanguageSwitch.jsx';
 
 export default function Settings({ user, onSignOut }) {
   const { t } = useLanguage();
@@ -8,6 +9,10 @@ export default function Settings({ user, onSignOut }) {
       <div className="settings-section">
         <p className="settings-label">{t('signedInAs')}</p>
         <p className="settings-user">{user}</p>
+      </div>
+      <div className="settings-section">
+        <p className="settings-label">{t('language')}</p>
+        <LanguageSwitch />
       </div>
       <button className="btn danger" type="button" onClick={onSignOut}>
         {t('signOut')}
