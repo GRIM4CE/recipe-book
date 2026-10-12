@@ -1,5 +1,6 @@
 import type { Client, Row } from "@libsql/client";
 import { SCHEMA } from "./db/schema.js";
+import { TRANSLATION_RULES_VERSION } from "./translate.js";
 import type {
   Category,
   Language,
@@ -160,6 +161,24 @@ export function createDb(client: Client) {
         await client.execute(
           "ALTER TABLE recipes ADD COLUMN language TEXT NOT NULL DEFAULT 'en'",
         );
+      }
+      // Translations made under older prompt rules are wrong now: drop them
+      // once, then record the version. Delete first, so a crash in between
+      // repeats the delete rather than skipping it.
+      const stored = await client.execute({
+        sql: "SELECT value FROM meta WHERE key = ?",
+        args: ["translation_rules_version"],
+      });
+      if (
+        !stored.rows[0] ||
+        Number(stored.rows[0].value) < TRANSLATION_RULES_VERSION
+      ) {
+        await client.execute("DELETE FROM recipe_translations");
+        await client.execute({
+          sql: `INSERT INTO meta (key, value) VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+          args: ["translation_rules_version", String(TRANSLATION_RULES_VERSION)],
+        });
       }
     },
 

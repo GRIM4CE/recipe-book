@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { createClient, type Client } from "@libsql/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDb, type Db } from "../src/db.js";
+import { TRANSLATION_RULES_VERSION } from "../src/translate.js";
 
 let dir: string;
 let client: Client;
@@ -285,5 +286,51 @@ describe("translations", () => {
       args: [recipe.id],
     });
     expect(Number(left.rows[0].n)).toBe(0);
+  });
+});
+
+describe("translation rules version", () => {
+  const fields = {
+    title: "Pancakes",
+    summary: "",
+    servings: "4",
+    ingredients: ["250 g flour"],
+    instructions: ["Mix."],
+    notes: "",
+  };
+
+  async function storedVersion() {
+    const rs = await client.execute(
+      "SELECT value FROM meta WHERE key = 'translation_rules_version'",
+    );
+    return rs.rows[0]?.value;
+  }
+
+  async function translationCount() {
+    const rs = await client.execute("SELECT COUNT(*) AS n FROM recipe_translations");
+    return Number(rs.rows[0].n);
+  }
+
+  it("records the current version on a fresh db", async () => {
+    expect(await storedVersion()).toBe(String(TRANSLATION_RULES_VERSION));
+  });
+
+  it("drops stored translations once when the version is older", async () => {
+    const recipe = await db.createRecipe(
+      { title: "Crêpes", language: "fr" },
+      { createdBy: "dev", source: "web" },
+    );
+    await db.setTranslation(recipe.id, "en", fields, recipe.updatedAt);
+    await client.execute(
+      "UPDATE meta SET value = '1' WHERE key = 'translation_rules_version'",
+    );
+
+    await db.applySchema();
+    expect(await translationCount()).toBe(0);
+    expect(await storedVersion()).toBe(String(TRANSLATION_RULES_VERSION));
+
+    await db.setTranslation(recipe.id, "en", fields, recipe.updatedAt);
+    await db.applySchema();
+    expect(await translationCount()).toBe(1);
   });
 });

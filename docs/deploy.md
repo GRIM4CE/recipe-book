@@ -216,7 +216,7 @@ dropped, not created.
 - [ ] Install the PWA on each phone (Share → Add to Home Screen)
 - [ ] New Recipe → paste recipe text → Extract prefills the form (proves ANTHROPIC_API_KEY)
 - [ ] New Recipe → paste a recipe-site URL → Extract prefills (or picker for several); a Claude share link either extracts or shows the copy-paste guidance
-- [ ] Save a recipe in French, switch the app to English → it reads translated (proves translation)
+- [ ] Save a recipe in French, switch the app to English → it reads translated (proves translation). Bumping `TRANSLATION_RULES_VERSION` in `src/translate.ts` drops all stored translations on the next deploy; they are regenerated when someone next switches language
 
 ## Notes
 
@@ -225,5 +225,8 @@ dropped, not created.
 - CI is the deploy path. A local `sam deploy` still works in a pinch (you'd
   need the parameter values); `samconfig.toml` stays gitignored because
   parameter overrides include secrets.
+- Translations are cached per recipe. When the translation prompt changes
+  so that old ones are wrong, bump `TRANSLATION_RULES_VERSION`; the next cold
+  start deletes every stored translation once and they regenerate on demand.
 - Cost expectation: Lambda + Cognito + S3 at household traffic ≈ $0; Amplify
   Hosting pennies/month; Turso free tier.

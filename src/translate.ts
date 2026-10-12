@@ -21,6 +21,11 @@ export interface Translator {
   }): Promise<TranslatableFields>;
 }
 
+// Bump whenever the prompt changes in a way that makes earlier translations
+// wrong. Every stored translation is dropped on the next start (see
+// applySchema) and regenerated on demand.
+export const TRANSLATION_RULES_VERSION = 2;
+
 type TranslateInput = Parameters<Translator["translate"]>[0];
 
 const LANGUAGE_NAMES: Record<Language, string> = { en: "English", fr: "French" };
