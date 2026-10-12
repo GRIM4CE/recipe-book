@@ -10,13 +10,20 @@ function Invite({ onInvited }) {
   const [error, setError] = useState(null);
   const [invited, setInvited] = useState(null);
   const [note, setNote] = useState('');
+  // The invitation text, prefilled from the template and editable before it
+  // is sent.
+  const [message, setMessage] = useState('');
 
   async function submit(e) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      setInvited(await api.inviteUser({ email: email.trim() }));
+      const created = await api.inviteUser({ email: email.trim() });
+      setInvited(created);
+      setMessage(
+        t('inviteMessage', { url: `${window.location.origin}/#/login`, email: created.email }),
+      );
       onInvited();
     } catch (err) {
       setError(err.message);
@@ -28,11 +35,8 @@ function Invite({ onInvited }) {
   function reset() {
     setEmail('');
     setInvited(null);
+    setMessage('');
   }
-
-  const message = invited
-    ? t('inviteMessage', { url: `${window.location.origin}/#/login`, email: invited.email })
-    : '';
 
   async function send() {
     try {
@@ -55,7 +59,13 @@ function Invite({ onInvited }) {
       {invited ? (
         <>
           <p>{t('invited', { email: invited.email })}</p>
-          <pre className="invite-message">{message}</pre>
+          <textarea
+            className="invite-message"
+            rows={9}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            aria-label={t('inviteTitle')}
+          />
           <div className="invite-actions">
             <button className="btn primary" type="button" onClick={send}>
               {t('sendInvite')}

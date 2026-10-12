@@ -170,8 +170,8 @@ app makes.
 
 The sign-in link is hidden from visitors, so a new person's first sign-in
 goes to `<app url>/#/login`. On each device: enter the email, choose “Email
-me a code instead”, then accept the “Add a passkey” banner. After that it's
-Face ID/fingerprint only. A lost phone just repeats this bootstrap.
+me a code instead”, then accept the “Add a passkey” banner. After that, signing in
+is just Face ID or a fingerprint; the email code stays as the fallback. A lost phone just repeats this bootstrap.
 
 ## 3. Web (Amplify Hosting)
 
