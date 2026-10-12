@@ -673,6 +673,14 @@ body {
   font-size: 1.1rem;
 }
 
+.invite-steps {
+  margin: 12px 0 18px;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 /* Categories */
 
 .categories-page {

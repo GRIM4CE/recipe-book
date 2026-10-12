@@ -39,6 +39,9 @@ export const api = {
   listCategories: () => req('/api/categories').then((b) => b.categories),
   listTags: () => req('/api/tags').then((b) => b.tags),
 
+  me: () => authed('/api/me'),
+  inviteUser: (data) => authed('/api/users', { method: 'POST', body: json(data) }),
+
   createRecipe: (data) => authed('/api/recipes', { method: 'POST', body: json(data) }),
   updateRecipe: (id, data) =>
     authed(`/api/recipes/${id}`, { method: 'PUT', body: json(data) }),
