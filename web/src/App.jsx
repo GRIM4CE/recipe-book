@@ -277,6 +277,9 @@ export default function App() {
     );
   }
 
+  const showSignIn =
+    devMode || hasDevicePasskey() || window.matchMedia('(display-mode: standalone)').matches;
+
   // A recipe fills the screen on its own: no wordmark, no nav, just the card
   // and its own back button.
   const bare = Boolean(detailMatch) && !error && !choosingUsername;
@@ -286,16 +289,23 @@ export default function App() {
       {!bare && (
         <header className="header">
           <a href="#/" className="wordmark">{t('appName')}</a>
-          {/* No sign-in button: members arrive through the invite link to
-              #/login, so visitors see only the book. */}
-          {user && (
+          {/* Visitors see only the book: the sign-in icon shows where a member
+              plausibly is (the installed app, a phone that has used a passkey,
+              local dev). Anyone else reaches #/login through the invite link. */}
+          {user ? (
             <nav className="nav">
               {route === '/' && <AddMenu />}
               <a className="icon-btn" href="#/settings" aria-label={t('settings')} title={t('settings')}>
                 <Icon name="user" />
               </a>
             </nav>
-          )}
+          ) : showSignIn ? (
+            <nav className="nav">
+              <a className="icon-btn" href="#/login" aria-label={t('signIn')} title={t('signIn')}>
+                <Icon name="user" />
+              </a>
+            </nav>
+          ) : null}
         </header>
       )}
       <main>
