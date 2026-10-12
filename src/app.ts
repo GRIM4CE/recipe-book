@@ -104,7 +104,7 @@ function parseRecipeInput(body: unknown): RecipeInput | string {
     summary: (b.summary as string | undefined)?.trim() ?? "",
     servings: (b.servings as string | undefined)?.trim() ?? "",
     notes: (b.notes as string | undefined)?.trim() ?? "",
-    language: (b.language as Language | undefined) ?? "en",
+    language: b.language as Language | undefined,
     ingredients: ((b.ingredients as string[] | undefined) ?? []).filter((s) =>
       s.trim(),
     ),

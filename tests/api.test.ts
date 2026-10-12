@@ -100,10 +100,29 @@ describe("recipes", () => {
       .put(`/api/recipes/${plain.body.id}`)
       .send({ title: "Crumpets", language: "fr" });
     expect(switched.body.language).toBe("fr");
-    const reset = await request(app)
+    const back = await request(app)
       .put(`/api/recipes/${plain.body.id}`)
-      .send({ title: "Crumpets" });
-    expect(reset.body.language).toBe("en");
+      .send({ title: "Crumpets", language: "en" });
+    expect(back.body.language).toBe("en");
+  });
+
+  it("keeps the language when an edit doesn't mention it", async () => {
+    const created = await request(app)
+      .post("/api/recipes")
+      .send({ title: "Blanquette", language: "fr" });
+    const edited = await request(app)
+      .put(`/api/recipes/${created.body.id}`)
+      .send({ title: "Blanquette", servings: "6" });
+    expect(edited.status).toBe(200);
+    expect(edited.body.language).toBe("fr");
+    expect((await request(app).get(`/api/recipes/${created.body.id}`)).body.language).toBe(
+      "fr",
+    );
+
+    const switched = await request(app)
+      .put(`/api/recipes/${created.body.id}`)
+      .send({ title: "Blanquette", language: "en" });
+    expect(switched.body.language).toBe("en");
   });
 
   it("rejects an unknown language", async () => {

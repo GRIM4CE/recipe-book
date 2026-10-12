@@ -301,7 +301,7 @@ export function createDb(client: Client) {
     async updateRecipe(id: number, input: RecipeInput): Promise<Recipe | null> {
       const rs = await client.execute({
         sql: `UPDATE recipes SET title = ?, summary = ?, servings = ?,
-          ingredients = ?, instructions = ?, notes = ?, language = ?, category_id = ?,
+          ingredients = ?, instructions = ?, notes = ?, language = COALESCE(?, language), category_id = ?,
           photo_key = ?, updated_at = ? WHERE id = ?`,
         args: [
           input.title,
@@ -310,7 +310,7 @@ export function createDb(client: Client) {
           JSON.stringify(input.ingredients ?? []),
           JSON.stringify(input.instructions ?? []),
           input.notes ?? "",
-          input.language ?? "en",
+          input.language ?? null,
           input.categoryId ?? null,
           input.photoKey ?? null,
           new Date().toISOString(),
