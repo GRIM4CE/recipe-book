@@ -62,6 +62,7 @@ jobs:
           EXTERNAL_API_SECRET: ${{ secrets.EXTERNAL_API_SECRET }}
           WEB_ORIGIN: ${{ vars.WEB_ORIGIN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ADMIN_USERNAMES: ${{ vars.ADMIN_USERNAMES }}
         run: |
           RP_ID="${WEB_ORIGIN#https://}"
           # sam rejects empty parameter values; omit the key until the
@@ -69,6 +70,9 @@ jobs:
           EXTRA=()
           if [ -n "$ANTHROPIC_API_KEY" ]; then
             EXTRA+=("AnthropicApiKey=$ANTHROPIC_API_KEY")
+          fi
+          if [ -n "$ADMIN_USERNAMES" ]; then
+            EXTRA+=("AdminUsernames=$ADMIN_USERNAMES")
           fi
           sam deploy \
             --stack-name recipe-book \

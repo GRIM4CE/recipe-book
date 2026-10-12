@@ -27,6 +27,10 @@ Parameters:
     NoEcho: true
     Default: ''
     Description: Anthropic API key for recipe import extraction (empty disables it)
+  AdminUsernames:
+    Type: String
+    Default: ''
+    Description: Comma-separated Cognito usernames allowed to invite new accounts from the app
 
 Resources:
   Api:
@@ -36,7 +40,9 @@ Resources:
       Runtime: nodejs22.x
       Architectures: [arm64]
       MemorySize: 512
-      Timeout: 60
+      # Extraction budgets 50s of model time (src/extract.ts); the rest is
+      # headroom for cold start and database round trips.
+      Timeout: 90
       # CORS stays unset here on purpose: Express handles it. Both set would
       # emit duplicate headers and browsers reject the response.
       FunctionUrlConfig:
@@ -52,9 +58,17 @@ Resources:
           COGNITO_USER_POOL_ID: !Ref UserPool
           COGNITO_CLIENT_ID: !Ref UserPoolClient
           S3_BUCKET: !Ref PhotosBucket
+          ADMIN_USERNAMES: !Ref AdminUsernames
       Policies:
         - S3WritePolicy:
             BucketName: !Ref PhotosBucket
+        # Invites from the app create accounts the way scripts/add-user.sh does.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminSetUserPassword
+              Resource: !GetAtt UserPool.Arn
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -70,7 +84,8 @@ Resources:
       UserPoolTier: ESSENTIALS
       WebAuthnRelyingPartyID: !Ref WebAuthnRpId
       WebAuthnUserVerification: required
-      # Accounts are created by the admin CLI (scripts/add-user.sh); nobody can sign up.
+      # Accounts are created by an admin (Settings → Invite in the app, or
+      # scripts/add-user.sh); nobody can sign up.
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
       # No self-service password reset: nothing can convert email access

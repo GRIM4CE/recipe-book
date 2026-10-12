@@ -5,10 +5,15 @@ import express, { type ErrorRequestHandler, type RequestHandler } from "express"
 import { requireUser, type TokenVerifier } from "./auth.js";
 import { createExternalRouter } from "./external.js";
 import type { Db } from "./db.js";
-import type { ExtractionResult, Extractor } from "./extract.js";
+import {
+  describeExtractionError,
+  type ExtractionResult,
+  type Extractor,
+} from "./extract.js";
 import type { Translator } from "./translate.js";
 import { LANGUAGES, type Language, type Recipe, type RecipeInput } from "./types.js";
 import type { Presigner } from "./uploads.js";
+import type { UserInviter } from "./users.js";
 
 export interface AppOptions {
   db: Db;
@@ -33,6 +38,11 @@ export interface AppOptions {
   // Translates a recipe into the other language. Absent → translation is
   // disabled (503).
   translator?: Translator | null;
+  // Creates Cognito accounts for new people. Absent → invites are disabled
+  // (503).
+  inviter?: UserInviter | null;
+  // Usernames allowed to invite. Anyone else gets 403 from POST /api/users.
+  adminUsernames?: string[];
 }
 
 function cors(webOrigin: string): RequestHandler {
@@ -129,6 +139,20 @@ function parseCategoryInput(
   return { name: b.name.trim(), color: b.color };
 }
 
+function parseInviteInput(
+  body: unknown,
+): { username: string; email: string } | string {
+  if (typeof body !== "object" || body === null) return "body must be an object";
+  const b = body as Record<string, unknown>;
+  const username = typeof b.username === "string" ? b.username.trim() : "";
+  if (!username || username.length > 64) return "username is required";
+  if (/\s/.test(username)) return "username must not contain spaces";
+  if (typeof b.email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email)) {
+    return "email must be a valid address";
+  }
+  return { username, email: b.email };
+}
+
 function parseTagName(body: unknown): string | null {
   if (typeof body !== "object" || body === null) return null;
   const b = body as Record<string, unknown>;
@@ -192,6 +216,7 @@ function attributionNotes(
 
 export function createApp(opts: AppOptions) {
   const { db } = opts;
+  const adminUsernames = opts.adminUsernames ?? [];
   const app = express();
   app.use(cors(opts.webOrigin ?? ""));
 
@@ -225,12 +250,14 @@ export function createApp(opts: AppOptions) {
         });
       } catch (err) {
         console.error("extraction failed:", err);
-        res.status(502).json({ error: "extraction failed" });
+        const { status, message } = describeExtractionError(err);
+        res.status(status).json({ error: message });
         return;
       }
       if (result.pageUnreadable) {
         res.status(422).json({
-          error: "couldn't read that page — copy the recipe text instead",
+          error:
+            "That site wouldn't let us read the page — many recipe sites block automated readers. Copy the recipe text from the page and paste it instead.",
         });
         return;
       }
@@ -529,6 +556,34 @@ export function createApp(opts: AppOptions) {
       return;
     }
     res.status(204).end();
+  });
+
+  app.get("/api/me", writeAuth, (_req, res) => {
+    const username = String(res.locals.username);
+    res.json({ username, canInvite: adminUsernames.includes(username) });
+  });
+
+  app.post("/api/users", writeAuth, async (req, res) => {
+    // Checked before the 503 so a non-admin never learns whether invites are
+    // configured.
+    if (!adminUsernames.includes(String(res.locals.username))) {
+      res.status(403).json({ error: "only an admin can invite" });
+      return;
+    }
+    if (!opts.inviter) {
+      res.status(503).json({ error: "invites are not configured" });
+      return;
+    }
+    const input = parseInviteInput(req.body);
+    if (typeof input === "string") {
+      res.status(400).json({ error: input });
+      return;
+    }
+    if ((await opts.inviter.invite(input)) === "exists") {
+      res.status(409).json({ error: "that username is already taken" });
+      return;
+    }
+    res.status(201).json({ username: input.username });
   });
 
   app.use(

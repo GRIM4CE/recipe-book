@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 import { blobToBase64, downscaleToJpeg } from '../image.js';
+import { describeImportError } from '../importError.js';
 import { LANGUAGES, LANGUAGE_NAMES } from '../i18n.js';
 import { useLanguage } from '../useLanguage.jsx';
 import ConfirmDialog from './ConfirmDialog.jsx';
@@ -38,7 +39,11 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
   // extraction.
   const [showImport, setShowImport] = useState(!recipe);
   const [importText, setImportText] = useState('');
-  const [importing, setImporting] = useState(false);
+  // While an extraction runs: a short line saying what is being read, null
+  // when idle. Failures land in importError, shown inside the panel so they
+  // are visible next to the button that was tapped.
+  const [importing, setImporting] = useState(null);
+  const [importError, setImportError] = useState(null);
   const [importUrl, setImportUrl] = useState('');
   // Non-null after an extraction that found several recipes: the picker list.
   const [foundRecipes, setFoundRecipes] = useState(null);
@@ -76,17 +81,17 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
     setShowImport(false);
   }
 
-  async function runImport(payload) {
-    setImporting(true);
-    setError(null);
+  async function runImport(payload, status) {
+    setImporting(status);
+    setImportError(null);
     try {
       const { recipes } = await api.extractRecipe(payload);
       if (recipes.length === 1) applyRecipe(recipes[0]);
       else setFoundRecipes(recipes);
     } catch (err) {
-      setError(err.message);
+      setImportError(describeImportError(err, t));
     } finally {
-      setImporting(false);
+      setImporting(null);
     }
   }
 
@@ -94,17 +99,19 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
     e.target.value = '';
-    setImporting(true);
-    setError(null);
+    const status =
+      files.length === 1 ? t('readingPhoto') : t('readingPhotos', { n: files.length });
+    setImporting(status);
+    setImportError(null);
     try {
       // Read every picked photo together — pages of one recipe or a batch.
       const images = await Promise.all(
         files.map(async (file) => blobToBase64(await downscaleToJpeg(file))),
       );
-      await runImport({ images, mediaType: 'image/jpeg' });
+      await runImport({ images, mediaType: 'image/jpeg' }, status);
     } catch (err) {
-      setError(err.message);
-      setImporting(false);
+      setImportError(describeImportError(err, t));
+      setImporting(null);
     }
   }
 
@@ -204,15 +211,17 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
                 value={importUrl}
                 onChange={(e) => setImportUrl(e.target.value)}
                 placeholder={t('importUrlPlaceholder')}
-                disabled={importing}
+                disabled={!!importing}
               />
               <button
                 className="btn ghost small"
                 type="button"
-                onClick={() => runImport({ url: importUrl.trim() })}
-                disabled={importing || !importUrl.trim()}
+                onClick={() =>
+                  runImport({ url: importUrl.trim() }, t('readingPage'))
+                }
+                disabled={!!importing || !importUrl.trim()}
               >
-                {importing ? t('reading') : t('extractUrl')}
+                {t('extractUrl')}
               </button>
             </div>
             <textarea
@@ -220,29 +229,43 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
               placeholder={t('importTextPlaceholder')}
-              disabled={importing}
+              disabled={!!importing}
             />
             <div className="form-actions import-actions">
               <button
                 className="btn ghost small"
                 type="button"
-                onClick={() => runImport({ text: importText })}
-                disabled={importing || !importText.trim()}
+                onClick={() => runImport({ text: importText }, t('readingText'))}
+                disabled={!!importing || !importText.trim()}
               >
-                {importing ? t('readingRecipe') : t('extractText')}
+                {t('extractText')}
               </button>
               <label className="btn ghost small">
-                {importing ? t('readingRecipe') : t('extractPhotos')}
+                {t('extractPhotos')}
                 <input
                   type="file"
                   accept="image/*"
                   multiple
                   onChange={importFromPhoto}
                   hidden
-                  disabled={importing}
+                  disabled={!!importing}
                 />
               </label>
             </div>
+            {importing && (
+              <p className="import-status" role="status">
+                <span className="spinner" aria-hidden="true" />
+                <span>
+                  {importing}{' '}
+                  <span className="hint-inline">{t('importWait')}</span>
+                </span>
+              </p>
+            )}
+            {importError && (
+              <p className="import-status error" role="alert">
+                {importError}
+              </p>
+            )}
           </div>
         ) : (
           <button
@@ -391,7 +414,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
         <a className="btn ghost" href={recipe ? `#/recipes/${recipe.id}` : '#/'}>
           {t('cancel')}
         </a>
-        <button className="btn primary" type="submit" disabled={busy || importing}>
+        <button className="btn primary" type="submit" disabled={busy || !!importing}>
           {busy ? t('saving') : t('saveRecipe')}
         </button>
       </div>
