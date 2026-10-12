@@ -638,6 +638,41 @@ body {
   min-width: 0;
 }
 
+/* Progress and failure lines live inside the panel, next to the button that
+   started the import — the form's own error sits below ten fields, out of
+   sight on a phone. */
+.import-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.spinner {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  border-top-color: var(--ink);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+    border-top-color: var(--ink-soft);
+  }
+}
+
 .login-form {
   max-width: 380px;
   padding-top: 24px;

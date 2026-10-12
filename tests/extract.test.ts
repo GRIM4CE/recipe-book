@@ -1,13 +1,18 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import Anthropic from "@anthropic-ai/sdk";
 import { createClient, type Client } from "@libsql/client";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import type { TokenVerifier } from "../src/auth.js";
 import { createDb, type Db } from "../src/db.js";
-import { buildPrompt } from "../src/extract.js";
+import {
+  buildPrompt,
+  describeExtractionError,
+  ExtractionFailure,
+} from "../src/extract.js";
 import type {
   ExtractInput,
   ExtractionResult,
@@ -206,9 +211,8 @@ describe("POST /api/extract", () => {
       .post("/api/extract")
       .send({ url: "https://claude.ai/share/abc" });
     expect(res.status).toBe(422);
-    expect(res.body.error).toBe(
-      "couldn't read that page — copy the recipe text instead",
-    );
+    expect(res.body.error).toMatch(/wouldn't let us read the page/);
+    expect(res.body.error).toMatch(/paste it instead/);
   });
 
   it("422s when nothing was found", async () => {
@@ -224,13 +228,67 @@ describe("POST /api/extract", () => {
     expect(res.body.error).toBe("no recipe found in that input");
   });
 
-  it("502s when extraction fails", async () => {
+  it("502s with a reason when extraction fails for an unknown cause", async () => {
     const app = createApp({
       db,
       extractor: stubExtractor(new Error("boom")).extractor,
     });
     const res = await request(app).post("/api/extract").send({ text: "x" });
     expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/failed unexpectedly/);
+  });
+
+  it("passes the reader's status and reason through to the client", async () => {
+    const limited = new Anthropic.RateLimitError(
+      429,
+      { type: "error", error: { type: "rate_limit_error", message: "slow" } },
+      "slow",
+      new Headers(),
+    );
+    const app = createApp({ db, extractor: stubExtractor(limited).extractor });
+    const res = await request(app).post("/api/extract").send({ text: "x" });
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatch(/rate-limited/);
+  });
+});
+
+describe("describeExtractionError", () => {
+  const body = (message: string) => ({
+    type: "error",
+    error: { type: "invalid_request_error", message },
+  });
+
+  it("names a timeout and suggests pasting the text", () => {
+    const d = describeExtractionError(new Anthropic.APIConnectionTimeoutError());
+    expect(d.status).toBe(504);
+    expect(d.message).toMatch(/longer than 50 seconds/);
+    expect(d.message).toMatch(/paste it instead/);
+  });
+
+  it("names a rejected API key", () => {
+    const d = describeExtractionError(
+      new Anthropic.AuthenticationError(401, body("invalid x-api-key"), "x", new Headers()),
+    );
+    expect(d.status).toBe(502);
+    expect(d.message).toMatch(/API key was rejected/);
+  });
+
+  it("surfaces the API's own message for other rejections", () => {
+    const d = describeExtractionError(
+      new Anthropic.BadRequestError(
+        400,
+        body("Your credit balance is too low to access the Anthropic API."),
+        "400 bad request",
+        new Headers(),
+      ),
+    );
+    expect(d.status).toBe(502);
+    expect(d.message).toMatch(/credit balance is too low/);
+  });
+
+  it("keeps an ExtractionFailure's own status and message", () => {
+    const d = describeExtractionError(new ExtractionFailure(422, "declined"));
+    expect(d).toEqual({ status: 422, message: "declined" });
   });
 });
 
