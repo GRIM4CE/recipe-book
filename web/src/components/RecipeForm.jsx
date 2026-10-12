@@ -376,6 +376,7 @@ export default function RecipeForm({ recipe, categories, tagSuggestions = [], on
       <label>
         {t('ingredients')} <span className="hint-inline">{t('onePerLine')}</span>
         <textarea
+          className="ingredients-input"
           rows={8}
           value={ingredients}
           onChange={(e) => setIngredients(e.target.value)}

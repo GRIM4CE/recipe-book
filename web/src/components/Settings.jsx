@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { useLanguage } from '../useLanguage.jsx';
+import Icon from './Icon.jsx';
 import LanguageSwitch from './LanguageSwitch.jsx';
 
 function Invite({ onInvited }) {
@@ -128,7 +129,7 @@ function People({ users }) {
   );
 }
 
-export default function Settings({ user, me, onSignOut }) {
+export default function Settings({ user, me, categoryCount, tagCount, onSignOut }) {
   const { t } = useLanguage();
   const canInvite = Boolean(me?.canInvite);
   const [users, setUsers] = useState([]);
@@ -146,6 +147,10 @@ export default function Settings({ user, me, onSignOut }) {
 
   return (
     <div className="settings-page">
+      <a className="btn outline back" href="#/">
+        <Icon name="chevron-left" size={16} />
+        {t('back')}
+      </a>
       <h2>{t('settings')}</h2>
       <div className="settings-section">
         <p className="settings-label">{t('signedInAs')}</p>
@@ -158,6 +163,23 @@ export default function Settings({ user, me, onSignOut }) {
       </div>
       {canInvite && users.length > 0 && <People users={users} />}
       {canInvite && <Invite onInvited={loadUsers} />}
+      <div className="settings-section">
+        <p className="settings-label">{t('organise')}</p>
+        <a className="settings-row" href="#/categories">
+          <span>
+            {t('categories')}
+            <span className="hint">{t('categoryCount', { n: categoryCount })}</span>
+          </span>
+          <Icon name="chevron-right" />
+        </a>
+        <a className="settings-row" href="#/tags">
+          <span>
+            {t('tags')}
+            <span className="hint">{t('tagCount', { n: tagCount })}</span>
+          </span>
+          <Icon name="chevron-right" />
+        </a>
+      </div>
       <button className="btn danger" type="button" onClick={onSignOut}>
         {t('signOut')}
       </button>
