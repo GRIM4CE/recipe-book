@@ -5,6 +5,7 @@ import { createCognitoVerifier } from "./auth.js";
 import { loadConfig } from "./config.js";
 import { createDb } from "./db.js";
 import { createClaudeExtractor } from "./extract.js";
+import { createClaudeTranslator } from "./translate.js";
 import { createLocalPresigner, createS3Presigner } from "./uploads.js";
 
 const config = loadConfig();
@@ -37,6 +38,9 @@ const app = createApp({
   externalSecret: config.externalApiSecret,
   extractor: config.anthropicApiKey
     ? createClaudeExtractor({ apiKey: config.anthropicApiKey })
+    : null,
+  translator: config.anthropicApiKey
+    ? createClaudeTranslator({ apiKey: config.anthropicApiKey })
     : null,
 });
 

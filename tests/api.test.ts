@@ -5,18 +5,47 @@ import { createClient, type Client } from "@libsql/client";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
-import { createDb } from "../src/db.js";
+import { createDb, type Db } from "../src/db.js";
+import type { TranslatableFields, Translator } from "../src/translate.js";
+
+// Prefixes every string with the target language so tests can see what was
+// translated; records calls, and throws when told to.
+function stubTranslator() {
+  const calls: { from: string; to: string; recipe: TranslatableFields }[] = [];
+  const state = { fail: false };
+  const mark = (to: string, s: string) => (s ? `[${to}] ${s}` : s);
+  const translator: Translator = {
+    async translate({ from, to, recipe }) {
+      calls.push({ from, to, recipe });
+      if (state.fail) throw new Error("boom");
+      return {
+        title: mark(to, recipe.title),
+        summary: mark(to, recipe.summary),
+        servings: mark(to, recipe.servings),
+        ingredients: recipe.ingredients.map((i) => mark(to, i)),
+        instructions: recipe.instructions.map((i) => mark(to, i)),
+        notes: mark(to, recipe.notes),
+      };
+    },
+  };
+  return { translator, calls, state };
+}
 
 let dir: string;
 let client: Client;
+let db: Db;
 let app: ReturnType<typeof createApp>;
+let translating: ReturnType<typeof stubTranslator>;
+let translateApp: ReturnType<typeof createApp>;
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), "recipe-api-"));
   client = createClient({ url: `file:${join(dir, "test.db")}` });
-  const db = createDb(client);
+  db = createDb(client);
   await db.applySchema();
   app = createApp({ db });
+  translating = stubTranslator();
+  translateApp = createApp({ db, translator: translating.translator });
 });
 
 afterAll(() => {
@@ -54,6 +83,56 @@ describe("recipes", () => {
     expect(list.body.recipes.some((r: { title: string }) => r.title === "Pancakes")).toBe(
       true,
     );
+  });
+
+  it("stores the recipe's language, defaulting to en", async () => {
+    const french = await request(app)
+      .post("/api/recipes")
+      .send({ title: "Crêpes", language: "fr" });
+    expect(french.status).toBe(201);
+    expect(french.body.language).toBe("fr");
+    expect(french.body.translations).toEqual({});
+
+    const plain = await request(app).post("/api/recipes").send({ title: "Crumpets" });
+    expect(plain.body.language).toBe("en");
+
+    const switched = await request(app)
+      .put(`/api/recipes/${plain.body.id}`)
+      .send({ title: "Crumpets", language: "fr" });
+    expect(switched.body.language).toBe("fr");
+    const back = await request(app)
+      .put(`/api/recipes/${plain.body.id}`)
+      .send({ title: "Crumpets", language: "en" });
+    expect(back.body.language).toBe("en");
+  });
+
+  it("keeps the language when an edit doesn't mention it", async () => {
+    const created = await request(app)
+      .post("/api/recipes")
+      .send({ title: "Blanquette", language: "fr" });
+    const edited = await request(app)
+      .put(`/api/recipes/${created.body.id}`)
+      .send({ title: "Blanquette", servings: "6" });
+    expect(edited.status).toBe(200);
+    expect(edited.body.language).toBe("fr");
+    expect((await request(app).get(`/api/recipes/${created.body.id}`)).body.language).toBe(
+      "fr",
+    );
+
+    const switched = await request(app)
+      .put(`/api/recipes/${created.body.id}`)
+      .send({ title: "Blanquette", language: "en" });
+    expect(switched.body.language).toBe("en");
+  });
+
+  it("rejects an unknown language", async () => {
+    for (const language of ["de", "", 1, null]) {
+      const res = await request(app)
+        .post("/api/recipes")
+        .send({ title: "Strudel", language });
+      expect(res.status, JSON.stringify(language)).toBe(400);
+      expect(res.body.error).toBe("language must be en or fr");
+    }
   });
 
   it("saves tags, deduping and trimming them", async () => {
@@ -198,6 +277,133 @@ describe("recipes", () => {
   });
 });
 
+describe("translations", () => {
+  const createFrench = async (title: string) =>
+    (
+      await request(translateApp).post("/api/recipes").send({
+        title,
+        summary: "Légères.",
+        servings: "4",
+        ingredients: ["2 c. à soupe de sucre", "2 oeufs"],
+        instructions: ["Mélanger.", "Cuire."],
+        notes: "Servir chaud.",
+        language: "fr",
+      })
+    ).body;
+
+  it("503s when no translator is configured", async () => {
+    const recipe = await request(app).post("/api/recipes").send({ title: "Untranslatable" });
+    const res = await request(app).post(`/api/recipes/${recipe.body.id}/translate`);
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe("translation is not configured");
+  });
+
+  it("404s a missing recipe", async () => {
+    const res = await request(translateApp).post("/api/recipes/999999/translate");
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("recipe not found");
+  });
+
+  it("translates a French recipe into English only", async () => {
+    const recipe = await createFrench("Crêpes Suzette");
+    translating.calls.length = 0;
+
+    const res = await request(translateApp).post(`/api/recipes/${recipe.id}/translate`);
+    expect(res.status).toBe(200);
+    expect(res.body.language).toBe("fr");
+    expect(res.body.title).toBe("Crêpes Suzette");
+    expect(Object.keys(res.body.translations)).toEqual(["en"]);
+    expect(res.body.translations.en).toEqual({
+      title: "[en] Crêpes Suzette",
+      summary: "[en] Légères.",
+      servings: "[en] 4",
+      ingredients: ["[en] 2 c. à soupe de sucre", "[en] 2 oeufs"],
+      instructions: ["[en] Mélanger.", "[en] Cuire."],
+      notes: "[en] Servir chaud.",
+      stale: false,
+    });
+    expect(translating.calls).toHaveLength(1);
+    expect(translating.calls[0]).toMatchObject({ from: "fr", to: "en" });
+
+    const fetched = await request(app).get(`/api/recipes/${recipe.id}`);
+    expect(fetched.body.translations.en.stale).toBe(false);
+  });
+
+  it("marks a translation stale after an edit, and fresh again once re-translated", async () => {
+    const recipe = await createFrench("Gaufres");
+    await request(translateApp).post(`/api/recipes/${recipe.id}/translate`);
+
+    const edited = await request(app)
+      .put(`/api/recipes/${recipe.id}`)
+      .send({ title: "Gaufres", language: "fr", ingredients: ["farine"] });
+    expect(edited.status).toBe(200);
+    expect(edited.body.translations.en.stale).toBe(true);
+    // The old translation is kept, just flagged.
+    expect(edited.body.translations.en.ingredients).toEqual([
+      "[en] 2 c. à soupe de sucre",
+      "[en] 2 oeufs",
+    ]);
+    const stale = await request(app).get(`/api/recipes/${recipe.id}`);
+    expect(stale.body.translations.en.stale).toBe(true);
+
+    const again = await request(translateApp).post(`/api/recipes/${recipe.id}/translate`);
+    expect(again.status).toBe(200);
+    expect(again.body.translations.en.stale).toBe(false);
+    expect(again.body.translations.en.ingredients).toEqual(["[en] farine"]);
+    expect(Object.keys(again.body.translations)).toEqual(["en"]);
+  });
+
+  it("carries translations on the list endpoint", async () => {
+    const recipe = await createFrench("Madeleines");
+    await request(translateApp).post(`/api/recipes/${recipe.id}/translate`);
+    const plain = await request(app).post("/api/recipes").send({ title: "Scones" });
+
+    const list = await request(app).get("/api/recipes");
+    const byId = new Map<number, { translations: Record<string, { title: string }> }>(
+      list.body.recipes.map((r: { id: number }) => [r.id, r]),
+    );
+    expect(byId.get(recipe.id)?.translations.en.title).toBe("[en] Madeleines");
+    expect(byId.get(plain.body.id)?.translations).toEqual({});
+  });
+
+  it("502s when the translator throws, storing nothing", async () => {
+    const recipe = await createFrench("Clafoutis");
+    translating.state.fail = true;
+    const res = await request(translateApp).post(`/api/recipes/${recipe.id}/translate`);
+    translating.state.fail = false;
+    expect(res.status).toBe(502);
+    expect(res.body.error).toBe("translation failed");
+    expect((await request(app).get(`/api/recipes/${recipe.id}`)).body.translations).toEqual(
+      {},
+    );
+  });
+
+  it("doesn't copy translations when duplicating, but keeps the language", async () => {
+    const recipe = await createFrench("Quiche");
+    await request(translateApp).post(`/api/recipes/${recipe.id}/translate`);
+
+    const copy = await request(app).post(`/api/recipes/${recipe.id}/duplicate`);
+    expect(copy.status).toBe(201);
+    expect(copy.body.language).toBe("fr");
+    expect(copy.body.translations).toEqual({});
+  });
+
+  it("removes translations when the recipe is deleted", async () => {
+    const recipe = await createFrench("Tarte Tatin");
+    await request(translateApp).post(`/api/recipes/${recipe.id}/translate`);
+    expect((await request(app).delete(`/api/recipes/${recipe.id}`)).status).toBe(204);
+
+    const left = await client.execute({
+      sql: "SELECT COUNT(*) AS n FROM recipe_translations WHERE recipe_id = ?",
+      args: [recipe.id],
+    });
+    expect(Number(left.rows[0].n)).toBe(0);
+
+    const recreated = await createFrench("Tarte Tatin");
+    expect(recreated.translations).toEqual({});
+  });
+});
+
 describe("schema migration", () => {
   it("adds the servings and notes columns to a database created before they existed", async () => {
     const old = createClient({ url: `file:${join(dir, "old.db")}` });
@@ -222,6 +428,39 @@ describe("schema migration", () => {
     );
     expect(recipe.servings).toBe("3");
     expect(recipe.notes).toBe("Grandma's version.");
+    old.close();
+  });
+
+  it("adds the language column to a database created before it existed", async () => {
+    const old = createClient({ url: `file:${join(dir, "no-language.db")}` });
+    await old.execute(`CREATE TABLE recipes (
+      id INTEGER PRIMARY KEY,
+      title TEXT NOT NULL,
+      summary TEXT NOT NULL DEFAULT '',
+      servings TEXT NOT NULL DEFAULT '',
+      ingredients TEXT NOT NULL DEFAULT '[]',
+      instructions TEXT NOT NULL DEFAULT '[]',
+      notes TEXT NOT NULL DEFAULT '',
+      category_id INTEGER,
+      photo_key TEXT,
+      created_by TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'web',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`);
+    await old.execute(
+      `INSERT INTO recipes (title, created_by, created_at, updated_at)
+       VALUES ('Before', 'dev', 'then', 'then')`,
+    );
+    const oldDb = createDb(old);
+    await oldDb.applySchema();
+    // Existing rows read as English; new ones can be French.
+    expect((await oldDb.listRecipes())[0].language).toBe("en");
+    const fr = await oldDb.createRecipe(
+      { title: "Après", language: "fr" },
+      { createdBy: "dev", source: "web" },
+    );
+    expect(fr.language).toBe("fr");
     old.close();
   });
 });
