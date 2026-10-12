@@ -3,7 +3,6 @@ import { api } from './api.js';
 import { currentUser, devMode, hasDevicePasskey, logout, registerPasskey } from './auth.js';
 import { localizeRecipe, recipeLanguage } from './i18n.js';
 import Categories from './components/Categories.jsx';
-import LanguageSwitch from './components/LanguageSwitch.jsx';
 import Login from './components/Login.jsx';
 import RecipeDetail from './components/RecipeDetail.jsx';
 import RecipeForm from './components/RecipeForm.jsx';
@@ -260,7 +259,6 @@ export default function App() {
         <header className="header">
           <a href="#/" className="wordmark">{t('appName')}</a>
           <nav className="nav">
-            <LanguageSwitch />
             {user ? (
               <>
                 <a className="btn primary small" href="#/new">{t('newRecipe')}</a>
