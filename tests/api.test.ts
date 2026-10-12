@@ -870,13 +870,16 @@ describe("usernames", () => {
     expect(copy.body.createdBy).toBe("Cuz II");
   });
 
-  it("signs with the sign-in name until one is chosen, and as dev locally", async () => {
+  it("refuses to sign a recipe until a username is chosen, and signs as dev locally", async () => {
     const { directory } = stubDirectory();
-    const created = await request(nameApp(directory))
+    const a = nameApp(directory);
+    const created = await request(a)
       .post("/api/recipes")
       .set("Authorization", "Bearer cousin-token")
       .send({ title: "Unsigned Soup" });
-    expect(created.body.createdBy).toBe("cousin");
+    expect(created.status).toBe(403);
+    expect(created.body.error).toBe("choose a username first");
+    expect(await db.findRecipeIdByTitle("Unsigned Soup")).toBeNull();
     const local = await request(app).post("/api/recipes").send({ title: "Local Soup" });
     expect(local.body.createdBy).toBe("dev");
     expect((await request(app).get("/api/me")).body.needsUsername).toBe(false);

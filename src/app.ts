@@ -303,10 +303,16 @@ export function createApp(opts: AppOptions) {
 
   app.use(express.json({ limit: "1mb" }));
 
-  // The name recipes are signed with: the person's chosen username, or their
-  // sign-in name until they pick one (always, in local dev).
-  const displayNameFor = async (username: string) =>
-    (await opts.directory?.getProfile(username))?.displayName ?? username;
+  // The name recipes are signed with: the person's chosen username, or the
+  // sign-in name when there are no accounts (local dev). With accounts, a
+  // sign-in name is an email, which must never land on a public recipe, so a
+  // person who hasn't chosen a username yet can't sign one (null).
+  const displayNameFor = async (username: string): Promise<string | null> => {
+    if (!opts.directory) return username;
+    return (await opts.directory.getProfile(username)).displayName;
+  };
+  const refuseUnsigned = (res: express.Response) =>
+    res.status(403).json({ error: "choose a username first" });
 
   const photoBaseUrl = opts.photoBaseUrl ?? "";
   const serialize = (r: Recipe) => ({
@@ -354,10 +360,12 @@ export function createApp(opts: AppOptions) {
       res.status(409).json({ error: "a recipe with that title already exists" });
       return;
     }
-    const recipe = await db.createRecipe(input, {
-      createdBy: await displayNameFor(String(res.locals.username)),
-      source: "web",
-    });
+    const createdBy = await displayNameFor(String(res.locals.username));
+    if (createdBy === null) {
+      refuseUnsigned(res);
+      return;
+    }
+    const recipe = await db.createRecipe(input, { createdBy, source: "web" });
     res.status(201).json(serialize(recipe));
   });
 
@@ -390,6 +398,11 @@ export function createApp(opts: AppOptions) {
       res.status(404).json({ error: "recipe not found" });
       return;
     }
+    const createdBy = await displayNameFor(String(res.locals.username));
+    if (createdBy === null) {
+      refuseUnsigned(res);
+      return;
+    }
     const copy = await db.createRecipe(
       {
         title: await copyTitle(original.title),
@@ -403,7 +416,7 @@ export function createApp(opts: AppOptions) {
         tags: original.tags,
         photoKey: original.photoKey,
       },
-      { createdBy: await displayNameFor(String(res.locals.username)), source: "web" },
+      { createdBy, source: "web" },
     );
     res.status(201).json(serialize(copy));
   });
