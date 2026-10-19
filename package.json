@@ -18,13 +18,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.133.0",
-    "@aws-sdk/client-cognito-identity-provider": "^3.1148.0",
-    "@aws-sdk/client-s3": "^3.1148.0",
-    "@aws-sdk/s3-request-presigner": "^3.1148.0",
+    "@anthropic-ai/sdk": "^0.135.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1152.0",
+    "@aws-sdk/client-s3": "^3.1152.0",
+    "@aws-sdk/s3-request-presigner": "^3.1152.0",
     "@libsql/client": "^0.18.0",
     "aws-jwt-verify": "^5.1.0",
-    "express": "^5.1.0",
+    "express": "^5.3.0",
     "serverless-http": "^4.0.0"
   },
   "devDependencies": {
@@ -36,6 +36,6 @@
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.5"
   }
 }
