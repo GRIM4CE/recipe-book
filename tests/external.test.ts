@@ -116,9 +116,25 @@ describe("external recipe import", () => {
     ).toBe(409);
   });
 
+  it("rejects an invalid photoKey and an upload without size", async () => {
+    for (const photoKey of ["../etc/passwd", "photos/x.jpg", 7]) {
+      const res = await request(app)
+        .post("/api/external/recipes")
+        .set(auth)
+        .send({ title: "bad photo", photoKey });
+      expect(res.status, String(photoKey)).toBe(400);
+    }
+    expect(
+      (await request(app).post("/api/external/uploads").set(auth)).status,
+    ).toBe(400);
+  });
+
   it("presigns uploads with the secret", async () => {
     expect((await request(app).post("/api/external/uploads")).status).toBe(401);
-    const res = await request(app).post("/api/external/uploads").set(auth);
+    const res = await request(app)
+      .post("/api/external/uploads")
+      .set(auth)
+      .send({ size: 15 });
     expect(res.status).toBe(200);
     expect(res.body.key).toMatch(/^photos\/[0-9a-f-]{36}\.jpg$/);
   });

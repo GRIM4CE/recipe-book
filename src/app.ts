@@ -7,7 +7,8 @@ import { createExternalRouter } from "./external.js";
 import type { Db } from "./db.js";
 import type { ExtractionResult, Extractor } from "./extract.js";
 import type { Recipe, RecipeInput } from "./types.js";
-import type { Presigner } from "./uploads.js";
+import { createRateLimiter } from "./rateLimit.js";
+import { isValidPhotoKey, parsePhotoSize, type Presigner } from "./uploads.js";
 
 export interface AppOptions {
   db: Db;
@@ -29,6 +30,9 @@ export interface AppOptions {
   // Turns pasted text or a recipe photo into structured fields. Absent →
   // extraction is disabled (503).
   extractor?: Extractor | null;
+  // Per-user cap on /api/extract (each call is an Opus request). Defaults to
+  // 10 per hour; counted per warm Lambda instance.
+  extractRateLimit?: { max: number; windowMs: number };
 }
 
 function cors(webOrigin: string): RequestHandler {
@@ -81,6 +85,9 @@ function parseRecipeInput(body: unknown): RecipeInput | string {
     typeof b.photoKey !== "string"
   ) {
     return "photoKey must be a string or null";
+  }
+  if (typeof b.photoKey === "string" && !isValidPhotoKey(b.photoKey)) {
+    return "photoKey is invalid";
   }
   const tags: string[] = [];
   for (const raw of (b.tags as string[] | undefined) ?? []) {
@@ -189,6 +196,10 @@ export function createApp(opts: AppOptions) {
     isProduction: opts.isProduction ?? false,
   });
 
+  const extractLimiter = createRateLimiter(
+    opts.extractRateLimit ?? { max: 10, windowMs: 60 * 60 * 1000 },
+  );
+
   // Registered before the global 1mb parser: the body carries a base64
   // image, so this route parses its own body with a larger cap.
   app.post(
@@ -203,6 +214,10 @@ export function createApp(opts: AppOptions) {
       const input = parseExtractInput(req.body);
       if (typeof input === "string") {
         res.status(400).json({ error: input });
+        return;
+      }
+      if (!extractLimiter.take(String(res.locals.sub))) {
+        res.status(429).json({ error: "too many extractions — try again later" });
         return;
       }
       const categories = await db.listCategories();
@@ -364,12 +379,17 @@ export function createApp(opts: AppOptions) {
     res.status(204).end();
   });
 
-  app.post("/api/uploads", writeAuth, async (_req, res) => {
+  app.post("/api/uploads", writeAuth, async (req, res) => {
     if (!opts.presigner) {
       res.status(503).json({ error: "photo uploads are not configured" });
       return;
     }
-    res.json(await opts.presigner.presign());
+    const size = parsePhotoSize(req.body);
+    if (typeof size === "string") {
+      res.status(400).json({ error: size });
+      return;
+    }
+    res.json(await opts.presigner.presign(size));
   });
 
   if (opts.localPhotoDir) {

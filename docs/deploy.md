@@ -190,7 +190,8 @@ deploy: Actions → deploy-api → Run workflow.
 
 Give the pushing automation two env values: the API base URL (`ApiUrl` without
 trailing slash) and the `EXTERNAL_API_SECRET`. Contract: optional
-`POST /api/external/uploads` (presign + PUT photo bytes), then
+`POST /api/external/uploads` with `{ size }` (photo byte length, max 10 MB;
+presign + PUT exactly that many bytes), then
 `POST /api/external/recipes` with
 `{ title, summary?, ingredients[], instructions[], category?, createdBy?, photoKey? }`
 and header `Authorization: Bearer <secret>`. Unknown category names are

@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import type { Db } from "./db.js";
 import type { Recipe } from "./types.js";
-import type { Presigner } from "./uploads.js";
+import { isValidPhotoKey, parsePhotoSize, type Presigner } from "./uploads.js";
 
 // Import surface for the trusted automation that pushes recipes. A single
 // long-lived bearer secret is the credential; every route 503s until the
@@ -44,6 +44,13 @@ export function createExternalRouter(opts: {
         return;
       }
     }
+    if (
+      b.photoKey != null &&
+      (typeof b.photoKey !== "string" || !isValidPhotoKey(b.photoKey))
+    ) {
+      res.status(400).json({ error: "photoKey is invalid" });
+      return;
+    }
     // Same unique-title rule the UI enforces: an importer that runs twice gets
     // told so rather than quietly making a second copy.
     if ((await opts.db.findRecipeIdByTitle(b.title.trim())) != null) {
@@ -81,12 +88,17 @@ export function createExternalRouter(opts: {
     res.status(201).json(opts.serialize(recipe));
   });
 
-  router.post("/uploads", requireSecret, async (_req, res) => {
+  router.post("/uploads", requireSecret, async (req, res) => {
     if (!opts.presigner) {
       res.status(503).json({ error: "photo uploads are not configured" });
       return;
     }
-    res.json(await opts.presigner.presign());
+    const size = parsePhotoSize(req.body);
+    if (typeof size === "string") {
+      res.status(400).json({ error: size });
+      return;
+    }
+    res.json(await opts.presigner.presign(size));
   });
 
   return router;

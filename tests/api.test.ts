@@ -112,6 +112,20 @@ describe("recipes", () => {
     ).toBe(400);
   });
 
+  it("rejects a photoKey outside the upload key format", async () => {
+    for (const photoKey of ["https://evil.example/x.jpg", "photos/../x.jpg", "photos/x.jpg"]) {
+      const res = await request(app)
+        .post("/api/recipes")
+        .send({ title: "photo test", photoKey });
+      expect(res.status, photoKey).toBe(400);
+    }
+    const ok = await request(app).post("/api/recipes").send({
+      title: "photo test",
+      photoKey: "photos/123e4567-e89b-12d3-a456-426614174000.jpg",
+    });
+    expect(ok.status).toBe(201);
+  });
+
   it("updates and deletes", async () => {
     const created = await request(app)
       .post("/api/recipes")

@@ -47,7 +47,10 @@ export const api = {
 
   // Presign, PUT the bytes directly to storage, return the stored key.
   uploadPhoto: async (blob) => {
-    const { uploadUrl, key } = await authed('/api/uploads', { method: 'POST' });
+    const { uploadUrl, key } = await authed('/api/uploads', {
+      method: 'POST',
+      body: json({ size: blob.size }),
+    });
     const res = await fetch(uploadUrl, {
       method: 'PUT',
       headers: { 'Content-Type': 'image/jpeg' },

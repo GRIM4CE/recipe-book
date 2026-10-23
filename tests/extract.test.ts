@@ -106,6 +106,23 @@ describe("POST /api/extract", () => {
     }
   });
 
+  it("rate limits extraction per user", async () => {
+    const { extractor, calls } = stubExtractor(one);
+    const app = createApp({
+      db,
+      extractor,
+      extractRateLimit: { max: 2, windowMs: 60_000 },
+    });
+    for (let i = 0; i < 2; i++) {
+      expect(
+        (await request(app).post("/api/extract").send({ text: "hi" })).status,
+      ).toBe(200);
+    }
+    const res = await request(app).post("/api/extract").send({ text: "hi" });
+    expect(res.status).toBe(429);
+    expect(calls).toHaveLength(2);
+  });
+
   it("extracts from text and resolves the category by name", async () => {
     const { extractor, calls } = stubExtractor(one);
     const app = createApp({ db, extractor });

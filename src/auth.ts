@@ -2,7 +2,7 @@ import type { RequestHandler } from "express";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 
 export interface TokenVerifier {
-  verify(token: string): Promise<{ username: string }>;
+  verify(token: string): Promise<{ username: string; sub?: string }>;
 }
 
 export function createCognitoVerifier(opts: {
@@ -17,7 +17,7 @@ export function createCognitoVerifier(opts: {
   return {
     async verify(token) {
       const payload = await verifier.verify(token);
-      return { username: String(payload.username) };
+      return { username: String(payload.username), sub: payload.sub };
     },
   };
 }
@@ -36,6 +36,7 @@ export function requireUser(opts: {
         return;
       }
       res.locals.username = "dev";
+      res.locals.sub = "dev";
       next();
       return;
     }
@@ -46,8 +47,9 @@ export function requireUser(opts: {
       return;
     }
     try {
-      const { username } = await opts.verifier.verify(token);
+      const { username, sub } = await opts.verifier.verify(token);
       res.locals.username = username;
+      res.locals.sub = sub ?? username;
       next();
     } catch {
       res.status(401).json({ error: "invalid token" });

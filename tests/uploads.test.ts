@@ -27,7 +27,7 @@ afterAll(() => {
 
 describe("local photo uploads", () => {
   it("presigns, stores, and serves a photo round-trip", async () => {
-    const presign = await request(app).post("/api/uploads");
+    const presign = await request(app).post("/api/uploads").send({ size: 15 });
     expect(presign.status).toBe(200);
     expect(presign.body.key).toMatch(/^photos\/[0-9a-f-]{36}\.jpg$/);
     expect(presign.body.uploadUrl).toBe(`/api/uploads/${presign.body.key}`);
@@ -43,6 +43,16 @@ describe("local photo uploads", () => {
     expect(served.status).toBe(200);
     expect(served.headers["content-type"]).toContain("image/jpeg");
     expect(Buffer.from(served.body)).toEqual(bytes);
+  });
+
+  it("rejects missing, non-integer, and oversized declared sizes", async () => {
+    for (const body of [{}, { size: "5" }, { size: 1.5 }, { size: 0 }, { size: 10 * 1024 * 1024 + 1 }]) {
+      const res = await request(app).post("/api/uploads").send(body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+    }
+    expect(
+      (await request(app).post("/api/uploads").send({ size: 10 * 1024 * 1024 })).status,
+    ).toBe(200);
   });
 
   it("rejects traversal-ish names", async () => {
