@@ -105,6 +105,28 @@ describe("external recipe import", () => {
     ).toBe(400);
   });
 
+  it("takes the recipe's language, defaulting to en and refusing others", async () => {
+    const french = await request(app)
+      .post("/api/external/recipes")
+      .set(auth)
+      .send({ title: "Pot-au-feu", language: "fr" });
+    expect(french.status).toBe(201);
+    expect(french.body.language).toBe("fr");
+
+    const plain = await request(app)
+      .post("/api/external/recipes")
+      .set(auth)
+      .send({ title: "Plain Toast" });
+    expect(plain.body.language).toBe("en");
+
+    const bad = await request(app)
+      .post("/api/external/recipes")
+      .set(auth)
+      .send({ title: "Sauerbraten", language: "de" });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error).toBe("language must be en or fr");
+  });
+
   it("refuses a title the book already holds", async () => {
     expect(
       (

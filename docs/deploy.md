@@ -130,6 +130,7 @@ Variables:
 |---|---|
 | `AWS_ROLE_ARN` | the role ARN echoed by the setup above |
 | `WEB_ORIGIN` | leave unset for now — filled in at step 4 |
+| `ADMIN_USERNAMES` | your Cognito username; comma-separate several. Who may invite from the app |
 
 ### First deploy + smoke test
 
@@ -144,26 +145,31 @@ curl <ApiUrl>/healthz                    # {"ok":true}
 curl <ApiUrl>/api/recipes                # {"recipes":[]}
 ```
 
-### Create the two accounts
+### Create accounts
 
-Sign-in is passkey-first with email codes as bootstrap/recovery, so each
-account needs a verified email and no usable password (the random one below
-only clears Cognito's initial challenge state; the app client has no
-password flow):
+Sign-in is by email code, so each account needs a verified email and no
+usable password (a random one is set, which only clears Cognito's initial
+challenge state; the app client has no password flow).
 
-```sh
-aws cognito-idp admin-create-user \
-  --user-pool-id <UserPoolId> --username <name> \
-  --user-attributes Name=email,Value=<email> Name=email_verified,Value=true \
-  --message-action SUPPRESS
-aws cognito-idp admin-set-user-password \
-  --user-pool-id <UserPoolId> --username <name> \
-  --password "$(openssl rand -base64 24)" --permanent
-```
+Set `ADMIN_USERNAMES` to your username (then deploy once), sign in, open
+Settings → Invite someone, enter just their email; their sign-in name is that
+email (lowercased), and the page offers to send them the instructions. On
+first sign-in each person picks a username, which is what recipes and the
+People list show; sign-in stays by email. Your own account, the first one,
+has to come from the CLI below, since nobody can invite before an admin
+exists. Settings also lists everyone who has an account.
 
-First sign-in on each device: enter the username, choose “Email me a code
-instead”, then accept the “Add a passkey” banner. After that it's Face
-ID/fingerprint only. A lost phone just repeats this bootstrap.
+The CLI alternative is `npm run add-user -- <name> <email>`; pass the email
+for both (`npm run add-user -- <email> <email>`) to get the same result as the
+in-app invite. It reads
+`USER_POOL_ID` from the environment, or looks it up from the stack outputs
+above, and runs `admin-create-user` (verified email, `--message-action
+SUPPRESS`) then `admin-set-user-password --permanent`: the same two calls the
+app makes.
+
+The sign-in icon is in the app's header (or open `<app url>/#/login`). On
+each device, the first and every later sign-in is the same: enter the name,
+receive a code by email, enter it. The device then stays signed in.
 
 ## 3. Web (Amplify Hosting)
 
@@ -202,13 +208,13 @@ dropped, not created.
 - [ ] `curl <ApiUrl>/healthz` → `{"ok":true}`
 - [ ] Amplify URL renders the (empty) grid — proves CORS
 - [ ] Sign in as each account with an email code; anonymous visitors see no write UI
-- [ ] Register a passkey on each phone; sign out and back in via passkey
 - [ ] Create a recipe with a photo — proves JWT, presign, public S3 read
 - [ ] Recipe shows "Added by <account>" attribution
 - [ ] `POST /api/external/recipes` with a wrong secret → 401; right secret → recipe appears
-- [ ] Install the PWA on both phones (Share → Add to Home Screen)
+- [ ] Install the PWA on each phone (Share → Add to Home Screen)
 - [ ] New Recipe → paste recipe text → Extract prefills the form (proves ANTHROPIC_API_KEY)
 - [ ] New Recipe → paste a recipe-site URL → Extract prefills (or picker for several); a Claude share link either extracts or shows the copy-paste guidance
+- [ ] Save a recipe in French, switch the app to English → it reads translated (proves translation). Bumping `TRANSLATION_RULES_VERSION` in `src/translate.ts` drops all stored translations on the next deploy; they are regenerated when someone next switches language
 
 ## Notes
 
@@ -217,5 +223,8 @@ dropped, not created.
 - CI is the deploy path. A local `sam deploy` still works in a pinch (you'd
   need the parameter values); `samconfig.toml` stays gitignored because
   parameter overrides include secrets.
+- Translations are cached per recipe. When the translation prompt changes
+  so that old ones are wrong, bump `TRANSLATION_RULES_VERSION`; the next cold
+  start deletes every stored translation once and they regenerate on demand.
 - Cost expectation: Lambda + Cognito + S3 at household traffic ≈ $0; Amplify
   Hosting pennies/month; Turso free tier.

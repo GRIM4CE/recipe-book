@@ -1,10 +1,13 @@
 import type { Client, Row } from "@libsql/client";
 import { SCHEMA } from "./db/schema.js";
+import { TRANSLATION_RULES_VERSION } from "./translate.js";
 import type {
   Category,
+  Language,
   Recipe,
   RecipeInput,
   RecipeSource,
+  RecipeTranslation,
   TagSummary,
 } from "./types.js";
 
@@ -28,7 +31,23 @@ function rowToCategory(row: Row): Category {
   };
 }
 
-function rowToRecipe(row: Row, tags: string[]): Recipe {
+type Translations = Recipe["translations"];
+
+// stale is computed on read: the translation is stale once the recipe has
+// been saved again after the version it was made from.
+function rowToTranslation(row: Row, recipeUpdatedAt: string): RecipeTranslation {
+  return {
+    title: String(row.title),
+    summary: String(row.summary),
+    servings: String(row.servings),
+    ingredients: JSON.parse(String(row.ingredients)),
+    instructions: JSON.parse(String(row.instructions)),
+    notes: String(row.notes),
+    stale: String(row.source_updated_at) !== recipeUpdatedAt,
+  };
+}
+
+function rowToRecipe(row: Row, tags: string[], translations: Translations): Recipe {
   return {
     id: Number(row.id),
     title: String(row.title),
@@ -37,6 +56,8 @@ function rowToRecipe(row: Row, tags: string[]): Recipe {
     ingredients: JSON.parse(String(row.ingredients)),
     instructions: JSON.parse(String(row.instructions)),
     notes: row.notes == null ? "" : String(row.notes),
+    language: String(row.language) as Language,
+    translations,
     category:
       row.c_id == null
         ? null
@@ -102,6 +123,22 @@ export function createDb(client: Client) {
     return map;
   }
 
+  async function translationsByRecipe(): Promise<Map<number, Translations>> {
+    const rs = await client.execute(
+      `SELECT t.*, r.updated_at AS recipe_updated_at FROM recipe_translations t
+       JOIN recipes r ON t.recipe_id = r.id`,
+    );
+    const map = new Map<number, Translations>();
+    for (const row of rs.rows) {
+      const id = Number(row.recipe_id);
+      map.set(id, {
+        ...map.get(id),
+        [String(row.language)]: rowToTranslation(row, String(row.recipe_updated_at)),
+      });
+    }
+    return map;
+  }
+
   return {
     async applySchema(): Promise<void> {
       await client.executeMultiple(SCHEMA);
@@ -119,6 +156,29 @@ export function createDb(client: Client) {
         await client.execute(
           "ALTER TABLE recipes ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
         );
+      }
+      if (!cols.rows.some((r) => r.name === "language")) {
+        await client.execute(
+          "ALTER TABLE recipes ADD COLUMN language TEXT NOT NULL DEFAULT 'en'",
+        );
+      }
+      // Translations made under older prompt rules are wrong now: drop them
+      // once, then record the version. Delete first, so a crash in between
+      // repeats the delete rather than skipping it.
+      const stored = await client.execute({
+        sql: "SELECT value FROM meta WHERE key = ?",
+        args: ["translation_rules_version"],
+      });
+      if (
+        !stored.rows[0] ||
+        Number(stored.rows[0].value) < TRANSLATION_RULES_VERSION
+      ) {
+        await client.execute("DELETE FROM recipe_translations");
+        await client.execute({
+          sql: `INSERT INTO meta (key, value) VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+          args: ["translation_rules_version", String(TRANSLATION_RULES_VERSION)],
+        });
       }
     },
 
@@ -180,7 +240,14 @@ export function createDb(client: Client) {
     async listRecipes(): Promise<Recipe[]> {
       const rs = await client.execute(`${RECIPE_SELECT} ORDER BY r.title COLLATE NOCASE`);
       const tags = await tagsByRecipe();
-      return rs.rows.map((row) => rowToRecipe(row, tags.get(Number(row.id)) ?? []));
+      const translations = await translationsByRecipe();
+      return rs.rows.map((row) =>
+        rowToRecipe(
+          row,
+          tags.get(Number(row.id)) ?? [],
+          translations.get(Number(row.id)) ?? {},
+        ),
+      );
     },
 
     async getRecipe(id: number): Promise<Recipe | null> {
@@ -194,9 +261,21 @@ export function createDb(client: Client) {
               WHERE rt.recipe_id = ? ORDER BY t.name COLLATE NOCASE`,
         args: [id],
       });
+      const translationRows = await client.execute({
+        sql: "SELECT * FROM recipe_translations WHERE recipe_id = ?",
+        args: [id],
+      });
+      const translations: Translations = {};
+      for (const row of translationRows.rows) {
+        translations[String(row.language) as Language] = rowToTranslation(
+          row,
+          String(rs.rows[0].updated_at),
+        );
+      }
       return rowToRecipe(
         rs.rows[0],
         tags.rows.map((r) => String(r.name)),
+        translations,
       );
     },
 
@@ -214,9 +293,9 @@ export function createDb(client: Client) {
       const now = new Date().toISOString();
       const rs = await client.execute({
         sql: `INSERT INTO recipes
-          (title, summary, servings, ingredients, instructions, notes, category_id,
-           photo_key, created_by, source, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (title, summary, servings, ingredients, instructions, notes, language,
+           category_id, photo_key, created_by, source, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
           input.title,
           input.summary ?? "",
@@ -224,6 +303,7 @@ export function createDb(client: Client) {
           JSON.stringify(input.ingredients ?? []),
           JSON.stringify(input.instructions ?? []),
           input.notes ?? "",
+          input.language ?? "en",
           input.categoryId ?? null,
           input.photoKey ?? null,
           meta.createdBy,
@@ -240,8 +320,8 @@ export function createDb(client: Client) {
     async updateRecipe(id: number, input: RecipeInput): Promise<Recipe | null> {
       const rs = await client.execute({
         sql: `UPDATE recipes SET title = ?, summary = ?, servings = ?,
-          ingredients = ?, instructions = ?, notes = ?, category_id = ?, photo_key = ?,
-          updated_at = ? WHERE id = ?`,
+          ingredients = ?, instructions = ?, notes = ?, language = COALESCE(?, language), category_id = ?,
+          photo_key = ?, updated_at = ? WHERE id = ?`,
         args: [
           input.title,
           input.summary ?? "",
@@ -249,6 +329,7 @@ export function createDb(client: Client) {
           JSON.stringify(input.ingredients ?? []),
           JSON.stringify(input.instructions ?? []),
           input.notes ?? "",
+          input.language ?? null,
           input.categoryId ?? null,
           input.photoKey ?? null,
           new Date().toISOString(),
@@ -260,9 +341,47 @@ export function createDb(client: Client) {
       return this.getRecipe(id);
     },
 
+    // One translation per target language; translating again replaces it.
+    // sourceUpdatedAt is the recipe's updatedAt the translation was made from.
+    async setTranslation(
+      recipeId: number,
+      language: Language,
+      fields: Omit<RecipeTranslation, "stale">,
+      sourceUpdatedAt: string,
+    ): Promise<void> {
+      await client.execute({
+        sql: `INSERT INTO recipe_translations
+          (recipe_id, language, title, summary, servings, ingredients, instructions,
+           notes, source_updated_at, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(recipe_id, language) DO UPDATE SET
+            title = excluded.title, summary = excluded.summary,
+            servings = excluded.servings, ingredients = excluded.ingredients,
+            instructions = excluded.instructions, notes = excluded.notes,
+            source_updated_at = excluded.source_updated_at,
+            created_at = excluded.created_at`,
+        args: [
+          recipeId,
+          language,
+          fields.title,
+          fields.summary,
+          fields.servings,
+          JSON.stringify(fields.ingredients),
+          JSON.stringify(fields.instructions),
+          fields.notes,
+          sourceUpdatedAt,
+          new Date().toISOString(),
+        ],
+      });
+    },
+
     async deleteRecipe(id: number): Promise<boolean> {
       await client.execute({
         sql: "DELETE FROM recipe_tags WHERE recipe_id = ?",
+        args: [id],
+      });
+      await client.execute({
+        sql: "DELETE FROM recipe_translations WHERE recipe_id = ?",
         args: [id],
       });
       const rs = await client.execute({
@@ -283,6 +402,15 @@ export function createDb(client: Client) {
         name: String(row.name),
         count: Number(row.count),
       }));
+    },
+
+    // Recipes per `created_by` value, exactly as stored: a display name for
+    // recipes signed after a person chose one, the sign-in name before that.
+    async countRecipesByCreator(): Promise<Map<string, number>> {
+      const rs = await client.execute(
+        "SELECT created_by, COUNT(*) AS n FROM recipes GROUP BY created_by",
+      );
+      return new Map(rs.rows.map((row) => [String(row.created_by), Number(row.n)]));
     },
 
     async renameTag(id: number, name: string): Promise<TagRenameResult> {

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import { LanguageProvider } from './useLanguage.jsx';
 import './styles.css';
 
 // iOS Safari ignores maximum-scale/user-scalable in the viewport meta for
@@ -9,7 +10,9 @@ document.addEventListener('gesturestart', (e) => e.preventDefault());
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <LanguageProvider>
+      <App />
+    </LanguageProvider>
   </StrictMode>,
 );
 

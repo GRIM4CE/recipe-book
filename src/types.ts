@@ -13,6 +13,20 @@ export interface TagSummary {
 
 export type RecipeSource = "web" | "import";
 
+export type Language = "en" | "fr";
+export const LANGUAGES: readonly Language[] = ["en", "fr"];
+
+export interface RecipeTranslation {
+  title: string;
+  summary: string;
+  servings: string;
+  ingredients: string[];
+  instructions: string[];
+  notes: string;
+  // true when the source recipe was edited after this translation was made
+  stale: boolean;
+}
+
 export interface Recipe {
   id: number;
   title: string;
@@ -21,6 +35,8 @@ export interface Recipe {
   ingredients: string[];
   instructions: string[];
   notes: string;
+  language: Language;
+  translations: Partial<Record<Language, RecipeTranslation>>;
   category: Category | null;
   tags: string[];
   photoKey: string | null;
@@ -37,6 +53,7 @@ export interface RecipeInput {
   ingredients?: string[];
   instructions?: string[];
   notes?: string;
+  language?: Language;
   categoryId?: number | null;
   tags?: string[];
   photoKey?: string | null;

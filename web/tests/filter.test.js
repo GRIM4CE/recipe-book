@@ -93,6 +93,31 @@ describe('filterRecipes', () => {
   });
 });
 
+describe('filterRecipes by person', () => {
+  const made = [
+    { id: 1, title: 'Soup', createdBy: 'jon', tags: ['Slow Cooked'] },
+    { id: 2, title: 'Salad', createdBy: 'marie' },
+    { id: 3, title: 'Stew', createdBy: 'jon' },
+  ];
+
+  it('keeps only recipes added by that person', () => {
+    expect(filterRecipes(made, { createdBy: 'jon' }).map((r) => r.id)).toEqual([1, 3]);
+    expect(filterRecipes(made, { createdBy: 'marie' }).map((r) => r.id)).toEqual([2]);
+    expect(filterRecipes(made, { createdBy: 'nobody' })).toEqual([]);
+  });
+
+  it('shows everyone when unset', () => {
+    expect(filterRecipes(made, { createdBy: null })).toHaveLength(3);
+  });
+
+  it('combines with the other filters', () => {
+    expect(filterRecipes(made, { createdBy: 'jon', tag: 'Slow Cooked' }).map((r) => r.id)).toEqual([
+      1,
+    ]);
+    expect(filterRecipes(made, { createdBy: 'marie', query: 'soup' })).toEqual([]);
+  });
+});
+
 describe('fuzzy and synonym search', () => {
   const items = [
     {
@@ -151,5 +176,86 @@ describe('fuzzy and synonym search', () => {
   it('does not match unrelated recipes on a fuzzy query', () => {
     expect(ids({ query: 'whisky' })).not.toContain(2);
     expect(ids({ query: 'whisky' })).not.toContain(3);
+  });
+});
+
+describe('filterRecipes across languages', () => {
+  const gratin = {
+    id: 1,
+    language: 'fr',
+    title: 'Gratin dauphinois',
+    summary: '',
+    ingredients: ['pommes de terre', 'crème'],
+    instructions: ['Cuire au four.'],
+    translations: {
+      en: {
+        title: 'Potato gratin',
+        summary: '',
+        ingredients: ['potatoes', 'cream'],
+        instructions: ['Bake in the oven.'],
+      },
+    },
+  };
+
+  it('finds a recipe through its translation', () => {
+    expect(filterRecipes([gratin], { query: 'potatoes' })).toHaveLength(1);
+    expect(filterRecipes([gratin], { query: 'pommes' })).toHaveLength(1);
+  });
+
+  it('still finds the source text when the list is shown translated', () => {
+    const shown = { ...gratin, title: 'Potato gratin', original: gratin };
+    expect(filterRecipes([shown], { query: 'dauphinois' })).toHaveLength(1);
+  });
+
+  it('does not match words found in no version', () => {
+    expect(filterRecipes([gratin], { query: 'bourbon' })).toHaveLength(0);
+  });
+});
+
+describe('accent-insensitive search', () => {
+  const items = [
+    {
+      id: 1,
+      title: 'Crème brûlée',
+      summary: '',
+      ingredients: ['500 ml crème fraîche', '4 œufs'],
+      instructions: ['Caraméliser le sucre.'],
+      category: null,
+    },
+    {
+      id: 2,
+      title: 'Pancakes',
+      summary: '',
+      ingredients: ['2 eggs', '1 cup flour'],
+      instructions: ['Fry.'],
+      category: null,
+    },
+  ];
+  const ids = (opts) => filterRecipes(items, opts).map((r) => r.id);
+
+  it('finds accented content with an accented query', () => {
+    expect(ids({ query: 'crème' })).toEqual([1]);
+    expect(ids({ query: 'brûlée' })).toEqual([1]);
+  });
+
+  it('finds accented content with an unaccented query', () => {
+    expect(ids({ query: 'creme' })).toEqual([1]);
+    expect(ids({ query: 'creme fraiche' })).toEqual([1]);
+    expect(ids({ query: 'carameliser' })).toEqual([1]);
+  });
+
+  it('finds an accented query in unaccented content', () => {
+    expect(ids({ query: 'crème brulee' })).toEqual([1]);
+  });
+
+  it('finds œufs with oeuf', () => {
+    expect(ids({ query: 'oeuf' })).toEqual([1]);
+    expect(ids({ query: 'œuf' })).toEqual([1]);
+  });
+
+  it('makes the ingredient filter accent-insensitive on both sides', () => {
+    expect(ids({ ingredient: 'creme' })).toEqual([1]);
+    expect(ids({ ingredient: 'Crème Fraîche' })).toEqual([1]);
+    expect(ids({ ingredient: 'oeufs' })).toEqual([1]);
   });
 });

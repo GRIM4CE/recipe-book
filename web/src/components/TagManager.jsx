@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { api } from '../api.js';
+import { useLanguage } from '../useLanguage.jsx';
+import Icon from './Icon.jsx';
 
 function Row({ tag, onChanged }) {
+  const { t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(tag.name);
   const [error, setError] = useState(null);
@@ -20,18 +23,18 @@ function Row({ tag, onChanged }) {
     return (
       <li className="tag-row">
         <span className="tag-name">{tag.name}</span>
-        <span className="tag-count" title={`Used by ${tag.count} recipes`}>
+        <span className="tag-count" title={t('usedBy', { n: tag.count })}>
           {tag.count}
         </span>
         <button className="btn ghost small" type="button" onClick={() => setEditing(true)}>
-          Rename
+          {t('rename')}
         </button>
         <button
           className="btn danger small"
           type="button"
           onClick={() => run(() => api.deleteTag(tag.id))}
         >
-          Delete
+          {t('delete')}
         </button>
         {error && <p className="error">{error}</p>}
       </li>
@@ -50,7 +53,7 @@ function Row({ tag, onChanged }) {
             setEditing(false);
           }}
         >
-          Cancel
+          {t('cancel')}
         </button>
         <button
           className="btn primary small"
@@ -59,7 +62,7 @@ function Row({ tag, onChanged }) {
             run(() => api.renameTag(tag.id, name.trim())).then(() => setEditing(false))
           }
         >
-          Save
+          {t('save')}
         </button>
       </div>
       {error && <p className="error">{error}</p>}
@@ -68,15 +71,22 @@ function Row({ tag, onChanged }) {
 }
 
 export default function TagManager({ tags, onChanged }) {
+  const { t } = useLanguage();
   return (
     <div className="tags-page">
-      <h2>Tags</h2>
+      {/* Reached from the header's + menu and from Settings: back goes to
+          whichever it was. */}
+      <button className="btn outline back" type="button" onClick={() => window.history.back()}>
+        <Icon name="chevron-left" size={16} />
+        {t('back')}
+      </button>
+      <h2>{t('tags')}</h2>
       {tags.length === 0 ? (
-        <p className="notice">No tags yet. Add tags to a recipe and they’ll show up here.</p>
+        <p className="notice">{t('noTags')}</p>
       ) : (
         <ul className="tag-list">
-          {tags.map((t) => (
-            <Row key={t.id} tag={t} onChanged={onChanged} />
+          {tags.map((tag) => (
+            <Row key={tag.id} tag={tag} onChanged={onChanged} />
           ))}
         </ul>
       )}

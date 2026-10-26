@@ -5,7 +5,9 @@ import { createCognitoVerifier } from "./auth.js";
 import { loadConfig } from "./config.js";
 import { createDb } from "./db.js";
 import { createClaudeExtractor } from "./extract.js";
+import { createClaudeTranslator } from "./translate.js";
 import { createLocalPresigner, createS3Presigner } from "./uploads.js";
+import { createCognitoDirectory } from "./users.js";
 
 const config = loadConfig();
 if (config.dbUrl.startsWith("file:")) mkdirSync(config.dataDir, { recursive: true });
@@ -37,6 +39,16 @@ const app = createApp({
   externalSecret: config.externalApiSecret,
   extractor: config.anthropicApiKey
     ? createClaudeExtractor({ apiKey: config.anthropicApiKey })
+    : null,
+  translator: config.anthropicApiKey
+    ? createClaudeTranslator({ apiKey: config.anthropicApiKey })
+    : null,
+  adminUsernames: config.adminUsernames,
+  directory: config.authEnabled
+    ? createCognitoDirectory({
+        userPoolId: config.cognitoUserPoolId,
+        region: config.cognitoRegion,
+      })
     : null,
 });
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useLanguage } from '../useLanguage.jsx';
 
 // Native <dialog> gives us focus trapping, Esc-to-cancel, and a backdrop for
 // free. `open` is controlled by the parent; closing always routes through
@@ -7,10 +8,11 @@ export default function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = 'Delete',
+  confirmLabel,
   onConfirm,
   onCancel,
 }) {
+  const { t } = useLanguage();
   const ref = useRef(null);
 
   useEffect(() => {
@@ -36,10 +38,10 @@ export default function ConfirmDialog({
       {message && <p className="modal-message">{message}</p>}
       <div className="modal-actions">
         <button className="btn ghost" type="button" onClick={onCancel}>
-          Cancel
+          {t('cancel')}
         </button>
         <button className="btn danger" type="button" onClick={onConfirm}>
-          {confirmLabel}
+          {confirmLabel ?? t('delete')}
         </button>
       </div>
     </dialog>

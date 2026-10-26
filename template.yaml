@@ -18,15 +18,15 @@ Parameters:
     Type: String
     Default: ''
     Description: Deployed web origin allowed by CORS (the Amplify URL)
-  WebAuthnRpId:
-    Type: String
-    Default: localhost
-    Description: Passkey relying-party ID (the web app's bare domain; CI derives it from WebOrigin)
   AnthropicApiKey:
     Type: String
     NoEcho: true
     Default: ''
     Description: Anthropic API key for recipe import extraction (empty disables it)
+  AdminUsernames:
+    Type: String
+    Default: ''
+    Description: Comma-separated Cognito usernames allowed to invite new accounts from the app
 
 Resources:
   Api:
@@ -36,7 +36,9 @@ Resources:
       Runtime: nodejs22.x
       Architectures: [arm64]
       MemorySize: 512
-      Timeout: 60
+      # Extraction budgets 50s of model time (src/extract.ts); the rest is
+      # headroom for cold start and database round trips.
+      Timeout: 90
       # CORS stays unset here on purpose: Express handles it. Both set would
       # emit duplicate headers and browsers reject the response.
       FunctionUrlConfig:
@@ -52,9 +54,22 @@ Resources:
           COGNITO_USER_POOL_ID: !Ref UserPool
           COGNITO_CLIENT_ID: !Ref UserPoolClient
           S3_BUCKET: !Ref PhotosBucket
+          ADMIN_USERNAMES: !Ref AdminUsernames
       Policies:
         - S3WritePolicy:
             BucketName: !Ref PhotosBucket
+        # Invites from the app create accounts the way scripts/add-user.sh does,
+        # Settings lists them, and each person's chosen username is read and
+        # written as their preferred_username attribute.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:AdminCreateUser
+                - cognito-idp:AdminGetUser
+                - cognito-idp:AdminSetUserPassword
+                - cognito-idp:AdminUpdateUserAttributes
+                - cognito-idp:ListUsers
+              Resource: !GetAtt UserPool.Arn
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -66,11 +81,10 @@ Resources:
     Type: AWS::Cognito::UserPool
     Properties:
       UserPoolName: recipe-book-users
-      # Essentials unlocks choice-based sign-in (passkeys + email OTP).
+      # Essentials unlocks choice-based sign-in (email OTP).
       UserPoolTier: ESSENTIALS
-      WebAuthnRelyingPartyID: !Ref WebAuthnRpId
-      WebAuthnUserVerification: required
-      # The two accounts are created by the admin CLI; nobody can sign up.
+      # Accounts are created by an admin (Settings → Invite in the app, or
+      # scripts/add-user.sh); nobody can sign up.
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
       # No self-service password reset: nothing can convert email access
@@ -83,7 +97,7 @@ Resources:
         SignInPolicy:
           # AWS refuses to drop PASSWORD from this list; the app client has
           # no password flow and recovery is admin-only, so it stays inert.
-          AllowedFirstAuthFactors: [PASSWORD, WEB_AUTHN, EMAIL_OTP]
+          AllowedFirstAuthFactors: [PASSWORD, EMAIL_OTP]
         PasswordPolicy:
           MinimumLength: 12
           RequireLowercase: false
@@ -100,10 +114,21 @@ Resources:
       ExplicitAuthFlows:
         - ALLOW_USER_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
-      # A device stays signed in for a year; renewal is one biometric tap.
-      RefreshTokenValidity: 365
+      # An unknown sign-in name gets the same response as a real one, so the
+      # public login page can't be used to find out who has an account.
+      PreventUserExistenceErrors: ENABLED
+      # The API checks a token's signature and expiry, never revocation, so a
+      # removed or signed-out person keeps writing until their access token
+      # runs out. Short tokens keep that window small; the app refreshes them
+      # quietly.
+      AccessTokenValidity: 15
+      # A device stays signed in for three months; renewal is one email code.
+      RefreshTokenValidity: 90
       TokenValidityUnits:
+        AccessToken: minutes
         RefreshToken: days
+      # On by default; stated because sign-out relies on RevokeToken.
+      EnableTokenRevocation: true
 
   PhotosBucket:
     Type: AWS::S3::Bucket

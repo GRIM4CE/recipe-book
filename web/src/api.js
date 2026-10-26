@@ -39,11 +39,17 @@ export const api = {
   listCategories: () => req('/api/categories').then((b) => b.categories),
   listTags: () => req('/api/tags').then((b) => b.tags),
 
+  me: () => authed('/api/me'),
+  setUsername: (username) => authed('/api/me/username', { method: 'POST', body: json({ username }) }),
+  listUsers: () => authed('/api/users'),
+  inviteUser: (data) => authed('/api/users', { method: 'POST', body: json(data) }),
+
   createRecipe: (data) => authed('/api/recipes', { method: 'POST', body: json(data) }),
   updateRecipe: (id, data) =>
     authed(`/api/recipes/${id}`, { method: 'PUT', body: json(data) }),
   deleteRecipe: (id) => authed(`/api/recipes/${id}`, { method: 'DELETE' }),
   duplicateRecipe: (id) => authed(`/api/recipes/${id}/duplicate`, { method: 'POST' }),
+  translateRecipe: (id) => authed(`/api/recipes/${id}/translate`, { method: 'POST' }),
 
   // Presign, PUT the bytes directly to storage, return the stored key.
   uploadPhoto: async (blob) => {

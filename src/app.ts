@@ -5,10 +5,16 @@ import express, { type ErrorRequestHandler, type RequestHandler } from "express"
 import { requireUser, type TokenVerifier } from "./auth.js";
 import { createExternalRouter } from "./external.js";
 import type { Db } from "./db.js";
-import type { ExtractionResult, Extractor } from "./extract.js";
-import type { Recipe, RecipeInput } from "./types.js";
+import {
+  describeExtractionError,
+  type ExtractionResult,
+  type Extractor,
+} from "./extract.js";
 import { createRateLimiter } from "./rateLimit.js";
+import type { Translator } from "./translate.js";
+import { LANGUAGES, type Language, type Recipe, type RecipeInput } from "./types.js";
 import { isValidPhotoKey, parsePhotoSize, type Presigner } from "./uploads.js";
+import type { UserDirectory } from "./users.js";
 
 export interface AppOptions {
   db: Db;
@@ -33,6 +39,15 @@ export interface AppOptions {
   // Per-user cap on /api/extract (each call is an Opus request). Defaults to
   // 10 per hour; counted per warm Lambda instance.
   extractRateLimit?: { max: number; windowMs: number };
+  // Translates a recipe into the other language. Absent → translation is
+  // disabled (503).
+  translator?: Translator | null;
+  // Creates and lists Cognito accounts. Absent → invites and the account list
+  // are disabled (503).
+  directory?: UserDirectory | null;
+  // Usernames allowed to invite and see accounts. Anyone else gets 403 from
+  // /api/users.
+  adminUsernames?: string[];
 }
 
 function cors(webOrigin: string): RequestHandler {
@@ -73,6 +88,12 @@ function parseRecipeInput(body: unknown): RecipeInput | string {
     return "notes must be a string";
   }
   if (
+    b.language !== undefined &&
+    !LANGUAGES.includes(b.language as Language)
+  ) {
+    return "language must be en or fr";
+  }
+  if (
     b.categoryId !== undefined &&
     b.categoryId !== null &&
     typeof b.categoryId !== "number"
@@ -101,6 +122,7 @@ function parseRecipeInput(body: unknown): RecipeInput | string {
     summary: (b.summary as string | undefined)?.trim() ?? "",
     servings: (b.servings as string | undefined)?.trim() ?? "",
     notes: (b.notes as string | undefined)?.trim() ?? "",
+    language: b.language as Language | undefined,
     ingredients: ((b.ingredients as string[] | undefined) ?? []).filter((s) =>
       s.trim(),
     ),
@@ -123,6 +145,26 @@ function parseCategoryInput(
     return "color must be a #rrggbb hex string";
   }
   return { name: b.name.trim(), color: b.color };
+}
+
+function parseInviteInput(
+  body: unknown,
+): { username: string; email: string } | string {
+  if (typeof body !== "object" || body === null) return "body must be an object";
+  const b = body as Record<string, unknown>;
+  if (typeof b.email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email.trim())) {
+    return "email must be a valid address";
+  }
+  // The email is the sign-in name, lowercased so it matches however it's typed.
+  const email = b.email.trim();
+  return { username: email.toLowerCase(), email };
+}
+
+function parseUsernameInput(body: unknown): string | null {
+  if (typeof body !== "object" || body === null) return null;
+  const name = (body as Record<string, unknown>).username;
+  if (typeof name !== "string") return null;
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{1,31}$/.test(name) ? name : null;
 }
 
 function parseTagName(body: unknown): string | null {
@@ -188,6 +230,7 @@ function attributionNotes(
 
 export function createApp(opts: AppOptions) {
   const { db } = opts;
+  const adminUsernames = opts.adminUsernames ?? [];
   const app = express();
   app.use(cors(opts.webOrigin ?? ""));
 
@@ -229,12 +272,14 @@ export function createApp(opts: AppOptions) {
         });
       } catch (err) {
         console.error("extraction failed:", err);
-        res.status(502).json({ error: "extraction failed" });
+        const { status, message } = describeExtractionError(err);
+        res.status(status).json({ error: message });
         return;
       }
       if (result.pageUnreadable) {
         res.status(422).json({
-          error: "couldn't read that page — copy the recipe text instead",
+          error:
+            "That site wouldn't let us read the page — many recipe sites block automated readers. Copy the recipe text from the page and paste it instead.",
         });
         return;
       }
@@ -257,6 +302,7 @@ export function createApp(opts: AppOptions) {
           servings: r.servings,
           ingredients: r.ingredients,
           instructions: r.instructions,
+          language: r.language,
           categoryId: category?.id ?? null,
           notes: attributionNotes(sourceUrl, r.credit),
         });
@@ -271,6 +317,17 @@ export function createApp(opts: AppOptions) {
   );
 
   app.use(express.json({ limit: "1mb" }));
+
+  // The name recipes are signed with: the person's chosen username, or the
+  // sign-in name when there are no accounts (local dev). With accounts, a
+  // sign-in name is an email, which must never land on a public recipe, so a
+  // person who hasn't chosen a username yet can't sign one (null).
+  const displayNameFor = async (username: string): Promise<string | null> => {
+    if (!opts.directory) return username;
+    return (await opts.directory.getProfile(username)).displayName;
+  };
+  const refuseUnsigned = (res: express.Response) =>
+    res.status(403).json({ error: "choose a username first" });
 
   const photoBaseUrl = opts.photoBaseUrl ?? "";
   const serialize = (r: Recipe) => ({
@@ -318,10 +375,12 @@ export function createApp(opts: AppOptions) {
       res.status(409).json({ error: "a recipe with that title already exists" });
       return;
     }
-    const recipe = await db.createRecipe(input, {
-      createdBy: String(res.locals.username),
-      source: "web",
-    });
+    const createdBy = await displayNameFor(String(res.locals.username));
+    if (createdBy === null) {
+      refuseUnsigned(res);
+      return;
+    }
+    const recipe = await db.createRecipe(input, { createdBy, source: "web" });
     res.status(201).json(serialize(recipe));
   });
 
@@ -354,6 +413,11 @@ export function createApp(opts: AppOptions) {
       res.status(404).json({ error: "recipe not found" });
       return;
     }
+    const createdBy = await displayNameFor(String(res.locals.username));
+    if (createdBy === null) {
+      refuseUnsigned(res);
+      return;
+    }
     const copy = await db.createRecipe(
       {
         title: await copyTitle(original.title),
@@ -362,13 +426,52 @@ export function createApp(opts: AppOptions) {
         ingredients: original.ingredients,
         instructions: original.instructions,
         notes: original.notes,
+        language: original.language,
         categoryId: original.category?.id ?? null,
         tags: original.tags,
         photoKey: original.photoKey,
       },
-      { createdBy: String(res.locals.username), source: "web" },
+      { createdBy, source: "web" },
     );
     res.status(201).json(serialize(copy));
+  });
+
+  // (Re)generates the recipe's translation into every other language. Always
+  // re-translates, so the UI can use it for both "translate" and "refresh".
+  app.post("/api/recipes/:id/translate", writeAuth, async (req, res) => {
+    if (!opts.translator) {
+      res.status(503).json({ error: "translation is not configured" });
+      return;
+    }
+    const id = Number(req.params.id);
+    const recipe = await db.getRecipe(id);
+    if (!recipe) {
+      res.status(404).json({ error: "recipe not found" });
+      return;
+    }
+    try {
+      for (const to of LANGUAGES) {
+        if (to === recipe.language) continue;
+        const fields = await opts.translator.translate({
+          from: recipe.language,
+          to,
+          recipe: {
+            title: recipe.title,
+            summary: recipe.summary,
+            servings: recipe.servings,
+            ingredients: recipe.ingredients,
+            instructions: recipe.instructions,
+            notes: recipe.notes,
+          },
+        });
+        await db.setTranslation(id, to, fields, recipe.updatedAt);
+      }
+    } catch (err) {
+      console.error("translation failed:", err);
+      res.status(502).json({ error: "translation failed" });
+      return;
+    }
+    res.json(serialize((await db.getRecipe(id)) as Recipe));
   });
 
   app.delete("/api/recipes/:id", writeAuth, async (req, res) => {
@@ -498,6 +601,82 @@ export function createApp(opts: AppOptions) {
       return;
     }
     res.status(204).end();
+  });
+
+  app.get("/api/me", writeAuth, async (_req, res) => {
+    const username = String(res.locals.username);
+    const profile = await opts.directory?.getProfile(username);
+    // With accounts, displayName is null until the person picks one (that is
+    // what needsUsername reports); without them (local dev) it is the username.
+    res.json({
+      username,
+      displayName: profile ? profile.displayName : username,
+      canInvite: adminUsernames.includes(username),
+      needsUsername: Boolean(profile) && profile?.displayName == null,
+    });
+  });
+
+  app.post("/api/me/username", writeAuth, async (req, res) => {
+    if (!opts.directory) {
+      res.status(503).json({ error: "accounts are not configured" });
+      return;
+    }
+    const displayName = parseUsernameInput(req.body);
+    if (displayName === null) {
+      res.status(400).json({
+        error: "username must be 2–32 letters, numbers, dots, dashes or underscores",
+      });
+      return;
+    }
+    if ((await opts.directory.setDisplayName(String(res.locals.username), displayName)) === "taken") {
+      res.status(409).json({ error: "that username is taken" });
+      return;
+    }
+    res.json({ displayName });
+  });
+
+  app.get("/api/users", writeAuth, async (_req, res) => {
+    if (!adminUsernames.includes(String(res.locals.username))) {
+      res.status(403).json({ error: "only an admin can see accounts" });
+      return;
+    }
+    if (!opts.directory) {
+      res.status(503).json({ error: "accounts are not configured" });
+      return;
+    }
+    // A recipe is signed with the display name or, before one was chosen, the
+    // sign-in name, so a person's recipes sit under any of their names.
+    const counts = await db.countRecipesByCreator();
+    const users = (await opts.directory.list()).map((u) => {
+      const names = new Set([u.displayName, u.username, u.email]);
+      let recipeCount = 0;
+      for (const name of names) recipeCount += (name && counts.get(name)) || 0;
+      return { ...u, state: u.displayName ? "active" : "invited", recipeCount };
+    });
+    res.json({ users });
+  });
+
+  app.post("/api/users", writeAuth, async (req, res) => {
+    // Checked before the 503 so a non-admin never learns whether invites are
+    // configured.
+    if (!adminUsernames.includes(String(res.locals.username))) {
+      res.status(403).json({ error: "only an admin can invite" });
+      return;
+    }
+    if (!opts.directory) {
+      res.status(503).json({ error: "invites are not configured" });
+      return;
+    }
+    const input = parseInviteInput(req.body);
+    if (typeof input === "string") {
+      res.status(400).json({ error: input });
+      return;
+    }
+    if ((await opts.directory.invite(input)) === "exists") {
+      res.status(409).json({ error: "that email already has an account" });
+      return;
+    }
+    res.status(201).json({ username: input.username, email: input.email });
   });
 
   app.use(

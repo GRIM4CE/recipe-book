@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
-import { currentUser, devMode, hasDevicePasskey, logout, registerPasskey } from './auth.js';
+import { currentUser, logout } from './auth.js';
+import { localizeRecipe, recipeLanguage } from './i18n.js';
+import AddMenu from './components/AddMenu.jsx';
 import Categories from './components/Categories.jsx';
+import ChooseUsername from './components/ChooseUsername.jsx';
+import Icon from './components/Icon.jsx';
 import Login from './components/Login.jsx';
 import RecipeDetail from './components/RecipeDetail.jsx';
 import RecipeForm from './components/RecipeForm.jsx';
 import RecipeGrid from './components/RecipeGrid.jsx';
 import Settings from './components/Settings.jsx';
 import TagManager from './components/TagManager.jsx';
+import { useLanguage } from './useLanguage.jsx';
 
 // Hash routing keeps the SPA deployable without rewrite rules: the path after
 // '#' is the route, e.g. #/recipes/12.
@@ -23,9 +28,12 @@ export function useHashRoute() {
 }
 
 export default function App() {
+  const { lang, t } = useLanguage();
   const route = useHashRoute();
   const [user, setUser] = useState(currentUser);
-  const [offerPasskey, setOfferPasskey] = useState(false);
+  // Who the API says is signed in: their chosen username, and whether they
+  // still have to pick one. Null while signed out or until it loads.
+  const [me, setMe] = useState(null);
   const [recipes, setRecipes] = useState(null);
   const [categories, setCategories] = useState([]);
   const [tags, setTags] = useState([]);
@@ -37,9 +45,16 @@ export default function App() {
     categoryId: null,
     tag: null,
     ingredient: '',
+    createdBy: null,
     filtersOpen: false,
   });
   const listScroll = useRef(0);
+  // Per-recipe language picks, kept here so a choice made on a recipe survives
+  // leaving it and coming back. Not saved: a reload starts from the
+  // reader's default again.
+  const [overrides, setOverrides] = useState({});
+  // Recipes being translated right now, by id.
+  const [inFlight, setInFlight] = useState(() => new Set());
 
   const reload = useCallback(() => {
     return Promise.all([api.listRecipes(), api.listCategories(), api.listTags()])
@@ -59,21 +74,64 @@ export default function App() {
   }, [reload]);
 
   useEffect(() => {
-    setOfferPasskey(Boolean(user) && !devMode && !hasDevicePasskey());
+    if (!user) {
+      setMe(null);
+      return;
+    }
+    let live = true;
+    api
+      .me()
+      .then((m) => live && setMe(m))
+      .catch(() => live && setMe(null));
+    return () => {
+      live = false;
+    };
   }, [user]);
 
-  async function addPasskey() {
+  async function saveUsername(username) {
+    await api.setUsername(username);
+    setMe(await api.me());
+  }
+
+  // Nothing is translated here: a translation is made when someone picks that
+  // language on the recipe (see onViewLanguage).
+  function onSaved(recipe) {
+    reload();
+    window.location.hash = `#/recipes/${recipe.id}`;
+  }
+
+  async function onTranslateRecipe(recipe) {
     try {
-      await registerPasskey();
-      setOfferPasskey(false);
+      await api.translateRecipe(recipe.id);
+      await reload();
     } catch (err) {
       window.alert(err.message);
     }
   }
 
-  function onSaved(recipe) {
-    reload();
-    window.location.hash = `#/recipes/${recipe.id}`;
+  // A language the recipe already has just switches the view. One it doesn't
+  // is translated first (signed in only; the switch greys it out otherwise).
+  async function onViewLanguage(recipe, language) {
+    const setView = () => setOverrides((o) => ({ ...o, [recipe.id]: language }));
+    if (language === recipe.language || recipe.translations?.[language]) {
+      setView();
+      return;
+    }
+    if (!user) return;
+    setInFlight((s) => new Set(s).add(recipe.id));
+    try {
+      await api.translateRecipe(recipe.id);
+      await reload();
+      setView();
+    } catch (err) {
+      window.alert(err.message);
+    } finally {
+      setInFlight((s) => {
+        const next = new Set(s);
+        next.delete(recipe.id);
+        return next;
+      });
+    }
   }
 
   // Lands on the copy's edit form: duplicating is how you start a variation,
@@ -105,27 +163,34 @@ export default function App() {
     window.location.hash = '#/';
   }
 
-  // The sign-in link renders only where the owner plausibly is: local dev, the
-  // installed PWA, or a browser that has already used a passkey. Visitors never
-  // see it; a fresh browser can still reach #/login by typing the URL.
-  const showSignIn =
-    devMode || hasDevicePasskey() || window.matchMedia('(display-mode: standalone)').matches;
+  // What readers see: each recipe in its own language, which is the reader's
+  // default (the header switch) unless they picked another for that recipe. The
+  // form edits the untouched `recipes` instead, so a translation is never saved
+  // as the source.
+  const shown = recipes?.map((r) => {
+    const viewLanguage = recipeLanguage(r, lang, overrides[r.id]);
+    return { ...localizeRecipe(r, viewLanguage), viewLanguage };
+  });
 
-  const tagSuggestions = [...new Set((recipes ?? []).flatMap((r) => r.tags ?? []))].sort(
+  const tagSuggestions = [...new Set((shown ?? []).flatMap((r) => r.tags ?? []))].sort(
     (a, b) => a.localeCompare(b),
   );
 
   const detailMatch = route.match(/^\/recipes\/(\d+)$/);
   const editMatch = route.match(/^\/recipes\/(\d+)\/edit$/);
-  const findRecipe = (id) => recipes?.find((r) => r.id === Number(id));
+  const findRecipe = (id, list = recipes) => list?.find((r) => r.id === Number(id));
+
+  const choosingUsername = Boolean(me?.needsUsername) && route !== '/login';
 
   let page;
-  if (error) {
-    page = <p className="notice">Couldn’t load recipes: {error}</p>;
+  if (choosingUsername) {
+    page = <ChooseUsername onSave={saveUsername} />;
+  } else if (error) {
+    page = <p className="notice">{t('loadError', { error })}</p>;
   } else if (route === '/login') {
     page = <Login onLogin={setUser} />;
   } else if (recipes === null) {
-    page = <p className="notice">Loading…</p>;
+    page = <p className="notice">{t('loading')}</p>;
   } else if (route === '/new') {
     page = user ? (
       <RecipeForm categories={categories} tagSuggestions={tagSuggestions} onSaved={onSaved} />
@@ -145,7 +210,7 @@ export default function App() {
         onDelete={onDeleteRecipe}
       />
     ) : (
-      <p className="notice">That recipe doesn’t exist (anymore).</p>
+      <p className="notice">{t('recipeMissing')}</p>
     );
   } else if (route === '/categories') {
     page = user ? (
@@ -161,26 +226,35 @@ export default function App() {
     );
   } else if (route === '/settings') {
     page = user ? (
-      <Settings user={user} onSignOut={signOut} />
+      <Settings
+        user={user}
+        me={me}
+        categoryCount={categories.length}
+        tagCount={tags.length}
+        onSignOut={signOut}
+      />
     ) : (
       <Login onLogin={setUser} />
     );
   } else if (detailMatch) {
-    const recipe = findRecipe(detailMatch[1]);
+    const recipe = findRecipe(detailMatch[1], shown);
     page = recipe ? (
       <RecipeDetail
         recipe={recipe}
-        recipes={recipes}
+        recipes={shown}
         canEdit={Boolean(user)}
+        busy={inFlight.has(recipe.id)}
         onDuplicate={onDuplicateRecipe}
+        onTranslate={onTranslateRecipe}
+        onViewLanguage={onViewLanguage}
       />
     ) : (
-      <p className="notice">That recipe doesn’t exist (anymore).</p>
+      <p className="notice">{t('recipeMissing')}</p>
     );
   } else {
     page = (
       <RecipeGrid
-        recipes={recipes}
+        recipes={shown}
         categories={categories}
         filters={filters}
         onFilters={setFilters}
@@ -191,43 +265,31 @@ export default function App() {
 
   // A recipe fills the screen on its own: no wordmark, no nav, just the card
   // and its own back button.
-  const bare = Boolean(detailMatch) && !error;
+  const bare = Boolean(detailMatch) && !error && !choosingUsername;
 
   return (
     <div className={bare ? 'app bare' : 'app'}>
       {!bare && (
         <header className="header">
-          <a href="#/" className="wordmark">Recipe Book</a>
-          <nav className="nav">
-            {user ? (
-              <>
-                <a className="btn primary small" href="#/new">+ Recipe</a>
-                <a className="btn ghost small" href="#/categories">Categories</a>
-                <a className="btn ghost small" href="#/tags">Tags</a>
-                <a className="icon-btn" href="#/settings" aria-label="Settings" title="Settings">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
-                    <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z" />
-                  </svg>
-                </a>
-              </>
-            ) : showSignIn ? (
-              <a className="btn ghost small" href="#/login">Sign in</a>
-            ) : null}
-          </nav>
+          <a href="#/" className="wordmark">{t('appName')}</a>
+          {/* Visitors see the sign-in icon; the login page itself is just a Cognito form. */}
+          {user ? (
+            <nav className="nav">
+              {route === '/' && <AddMenu />}
+              <a className="icon-btn" href="#/settings" aria-label={t('settings')} title={t('settings')}>
+                <Icon name="user" />
+              </a>
+            </nav>
+          ) : (
+            <nav className="nav">
+              <a className="icon-btn" href="#/login" aria-label={t('signIn')} title={t('signIn')}>
+                <Icon name="user" />
+              </a>
+            </nav>
+          )}
         </header>
       )}
       <main>
-        {offerPasskey && (
-          <p className="notice">
-            Add a passkey to sign in with just Face ID / fingerprint next time.{' '}
-            <button className="btn primary small" type="button" onClick={addPasskey}>
-              Add passkey
-            </button>{' '}
-            <button className="btn ghost small" type="button" onClick={() => setOfferPasskey(false)}>
-              Not now
-            </button>
-          </p>
-        )}
         {page}
       </main>
     </div>

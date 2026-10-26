@@ -29,9 +29,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -40,7 +40,7 @@ jobs:
 
       - run: npm test
 
-      - uses: aws-actions/setup-sam@v2
+      - uses: aws-actions/setup-sam@v3
         with:
           use-installer: true
 
@@ -48,7 +48,7 @@ jobs:
       # scratch dir, so esbuild must be on the PATH of the build host.
       - run: npm install -g esbuild@0.28.1
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
@@ -62,13 +62,16 @@ jobs:
           EXTERNAL_API_SECRET: ${{ secrets.EXTERNAL_API_SECRET }}
           WEB_ORIGIN: ${{ vars.WEB_ORIGIN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ADMIN_USERNAMES: ${{ vars.ADMIN_USERNAMES }}
         run: |
-          RP_ID="${WEB_ORIGIN#https://}"
           # sam rejects empty parameter values; omit the key until the
           # secret exists (the template default then disables the import).
           EXTRA=()
           if [ -n "$ANTHROPIC_API_KEY" ]; then
             EXTRA+=("AnthropicApiKey=$ANTHROPIC_API_KEY")
+          fi
+          if [ -n "$ADMIN_USERNAMES" ]; then
+            EXTRA+=("AdminUsernames=$ADMIN_USERNAMES")
           fi
           sam deploy \
             --stack-name recipe-book \
@@ -82,5 +85,4 @@ jobs:
               "DbAuthToken=$DB_AUTH_TOKEN" \
               "ExternalApiSecret=$EXTERNAL_API_SECRET" \
               "WebOrigin=$WEB_ORIGIN" \
-              "WebAuthnRpId=${RP_ID:-localhost}" \
               "${EXTRA[@]}"

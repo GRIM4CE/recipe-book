@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.js';
+import { useLanguage } from '../useLanguage.jsx';
+import Icon from './Icon.jsx';
 
 const PALETTE = [
   '#E85D4C',
@@ -13,6 +15,7 @@ const PALETTE = [
 ];
 
 function Swatches({ value, onPick }) {
+  const { t } = useLanguage();
   return (
     <div className="swatches">
       {PALETTE.map((color) => (
@@ -22,7 +25,7 @@ function Swatches({ value, onPick }) {
           className={value === color ? 'swatch active' : 'swatch'}
           style={{ '--swatch': color }}
           onClick={() => onPick(color)}
-          aria-label={`Color ${color}`}
+          aria-label={t('colorLabel', { color })}
         />
       ))}
     </div>
@@ -30,6 +33,7 @@ function Swatches({ value, onPick }) {
 }
 
 function Row({ category, onChanged }) {
+  const { t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(category.name);
   const [color, setColor] = useState(category.color);
@@ -51,14 +55,14 @@ function Row({ category, onChanged }) {
         <span className="swatch static" style={{ '--swatch': category.color }} />
         <span className="category-name">{category.name}</span>
         <button className="btn ghost small" type="button" onClick={() => setEditing(true)}>
-          Edit
+          {t('edit')}
         </button>
         <button
           className="btn danger small"
           type="button"
           onClick={() => run(() => api.deleteCategory(category.id))}
         >
-          Delete
+          {t('delete')}
         </button>
         {error && <p className="error">{error}</p>}
       </li>
@@ -71,7 +75,7 @@ function Row({ category, onChanged }) {
       <Swatches value={color} onPick={setColor} />
       <div className="form-actions">
         <button className="btn ghost small" type="button" onClick={() => setEditing(false)}>
-          Cancel
+          {t('cancel')}
         </button>
         <button
           className="btn primary small"
@@ -82,7 +86,7 @@ function Row({ category, onChanged }) {
             )
           }
         >
-          Save
+          {t('save')}
         </button>
       </div>
       {error && <p className="error">{error}</p>}
@@ -91,6 +95,7 @@ function Row({ category, onChanged }) {
 }
 
 export default function Categories({ categories, onChanged }) {
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [color, setColor] = useState(PALETTE[0]);
   const [error, setError] = useState(null);
@@ -109,22 +114,28 @@ export default function Categories({ categories, onChanged }) {
 
   return (
     <div className="categories-page">
-      <h2>Categories</h2>
+      {/* Reached from the header's + menu and from Settings: back goes to
+          whichever it was. */}
+      <button className="btn outline back" type="button" onClick={() => window.history.back()}>
+        <Icon name="chevron-left" size={16} />
+        {t('back')}
+      </button>
+      <h2>{t('categories')}</h2>
       <ul className="category-list">
         {categories.map((c) => (
           <Row key={c.id} category={c} onChanged={onChanged} />
         ))}
       </ul>
       <form className="form category-add" onSubmit={add}>
-        <h3>Add category</h3>
+        <h3>{t('addCategory')}</h3>
         <label>
-          Name
+          {t('name')}
           <input value={name} onChange={(e) => setName(e.target.value)} required />
         </label>
         <Swatches value={color} onPick={setColor} />
         {error && <p className="error">{error}</p>}
         <button className="btn primary" type="submit">
-          Add
+          {t('add')}
         </button>
       </form>
     </div>

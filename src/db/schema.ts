@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS recipes (
   ingredients TEXT NOT NULL DEFAULT '[]',
   instructions TEXT NOT NULL DEFAULT '[]',
   notes TEXT NOT NULL DEFAULT '',
+  language TEXT NOT NULL DEFAULT 'en',
   category_id INTEGER REFERENCES categories(id),
   photo_key TEXT,
   created_by TEXT NOT NULL,
@@ -36,4 +37,20 @@ CREATE TABLE IF NOT EXISTS recipe_tags (
   tag_id INTEGER NOT NULL REFERENCES tags(id),
   PRIMARY KEY (recipe_id, tag_id)
 );
+
+CREATE TABLE IF NOT EXISTS recipe_translations (
+  recipe_id INTEGER NOT NULL REFERENCES recipes(id),
+  language TEXT NOT NULL,
+  title TEXT NOT NULL,
+  summary TEXT NOT NULL DEFAULT '',
+  servings TEXT NOT NULL DEFAULT '',
+  ingredients TEXT NOT NULL DEFAULT '[]',
+  instructions TEXT NOT NULL DEFAULT '[]',
+  notes TEXT NOT NULL DEFAULT '',
+  source_updated_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (recipe_id, language)
+);
+
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `;

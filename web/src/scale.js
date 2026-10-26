@@ -20,6 +20,9 @@ const NUM = `(?:\\d+\\s+\\d+\\s*/\\s*\\d+|\\d+\\s*/\\s*\\d+|\\d*\\s*[${FRACTION_
 
 const LEAD = new RegExp(`^(${NUM})(\\s*([-–—])\\s*(${NUM}))?([\\s\\S]*)$`);
 const UNIT_WORD = /^\s*([A-Za-z]+)\.?(?=[\s,)]|$)/;
+// French spoons ("c. à soupe", "cuillère à café") start like an English "c."
+// (cup) but are followed by "à"; they scale numerically, not as cups.
+const FRENCH_SPOON = /^\s*(?:c|cuill?(?:[eè]res?)?)\.?\s+[àa]\s/i;
 const FIRST_NUM = new RegExp(`(${NUM})(\\s*([-–—])\\s*(${NUM}))?`);
 
 // Teaspoons per unit, for the units we re-express when scaling. Single
@@ -113,7 +116,7 @@ export function scaleIngredient(line, factor) {
     return `${formatNumber(qty * factor)}${sep}${formatNumber(parseQuantity(second) * factor)}${tail}`;
   }
   const unit = tail.match(UNIT_WORD);
-  const tspPer = unit ? volumeTsp(unit[1]) : null;
+  const tspPer = unit && !FRENCH_SPOON.test(tail) ? volumeTsp(unit[1]) : null;
   if (tspPer) {
     return `${formatVolume(qty * factor * tspPer)}${tail.slice(unit[0].length)}`;
   }
